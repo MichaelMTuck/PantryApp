@@ -1,0 +1,1 @@
+// Displays information about a specific ingredient

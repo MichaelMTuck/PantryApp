@@ -1,0 +1,1 @@
+// Service for managing pantry-related operations

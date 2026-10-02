@@ -1,0 +1,1 @@
+// Represents a single recipe in the app

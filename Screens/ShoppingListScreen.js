@@ -1,0 +1,1 @@
+// Displays the shopping list for the user

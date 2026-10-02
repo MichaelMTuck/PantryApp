@@ -1,0 +1,1 @@
+// Displays all the recipes in the app in a concise manner (no step by step instructions)

@@ -1,0 +1,1 @@
+// Represents a single item in the pantry
