@@ -1,20 +1,32 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { NavigationContainer } from "@react-navigation/native";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { Ionicons } from "@expo/vector-icons";
+
+import Home from "./Screens/HomeScreen";
+import Pantry from "./Screens/PantryScreen";
+import Recipes from "./Screens/RecipesScreen";
+
+const Tab = createBottomTabNavigator();
+
+// Icons we will replace with Ellie's
+const icons = { Home: "home", Pantry: "basket", Recipes: "restaurant" };
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    //https://dev.to/fonyuygita/building-veli-a-complete-react-native-tab-navigation-tutorial-gnm
+    <NavigationContainer>
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name={icons[route.name]} size={size} color={color} />
+          ),
+          tabBarActiveTintColor: "#2e7d32",
+        })}
+      >
+        <Tab.Screen name="Home" component={Home} />
+        <Tab.Screen name="Pantry" component={Pantry} />
+        <Tab.Screen name="Recipes" component={Recipes} />
+      </Tab.Navigator>
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
