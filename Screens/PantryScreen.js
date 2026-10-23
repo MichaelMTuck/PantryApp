@@ -23,14 +23,28 @@ const initialItems = [{
   date: "10/10/2020"
 }];
 
-  export default function Pantry() {
-    const[items, setItems] = useState(initialItems);
-    return (
-      //https://reactnative.dev/docs/flatlist?language=typescript
-       <FlatList
-        data={initialItems}
-        renderItem={({item}) => <PantryItem {...item} />}
-        keyExtractor={item => item.id}
+export default function Pantry() {
+  const [items, setItems] = useState(initialItems);
+  const [searchText, setSearchText] = useState("");
+
+  const filteredItems = items.filter(item =>
+    item.name.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  return (
+    <View>
+      <TextInput
+        placeholder="Search pantry items..."
+        value={searchText}
+        onChangeText={setSearchText}
       />
-    );
-  }
+
+      {/* https://reactnative.dev/docs/flatlist?language=typescript */}
+      <FlatList
+        data={filteredItems}
+        renderItem={({ item }) => <PantryItem {...item} />}
+        keyExtractor={item => item.id.toString()}
+      />
+    </View>
+  );
+}
