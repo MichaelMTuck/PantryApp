@@ -6,8 +6,6 @@ const pool = require('./db');
 
 const router = express.Router();
 
-// Behind Tailscale Serve, this intentionally limits all clients together.
-// Do not enable "trust proxy" without configuring trusted proxies.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 30,
@@ -18,7 +16,7 @@ const loginLimiter = rateLimit({
   },
 });
 
-// Used to perform a password comparison even for unknown accounts.
+// Used to perform a password comparison
 const dummyHash = bcrypt.hashSync(
   randomBytes(32).toString('hex'),
   12
@@ -84,7 +82,7 @@ async function createSession(db, userId) {
   };
 }
 
-// Middleware that later pantry routes can also use.
+// Auth Function to require a valid session token for protected routes.
 async function requireAuth(req, res, next) {
   const header = req.get('authorization') || '';
   const match = /^Bearer ([a-f0-9]{64})$/i.exec(header);

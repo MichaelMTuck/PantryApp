@@ -9,8 +9,7 @@ const app = express();
 const pantryRouter = require('./pantries');
 
 app.use(express.json());
-app.use('/api', authRouter);
-app.use('/api', pantryRouter);
+
 
 app.get('/api/health', async (req, res) => {
   try {
@@ -29,6 +28,9 @@ app.get('/api/health', async (req, res) => {
     });
   }
 });
+
+app.use('/api', authRouter);
+app.use('/api', pantryRouter);
 
 const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 3000);

@@ -5,7 +5,7 @@ const { requireAuth } = require('./auth');
 
 const router = express.Router();
 
-// All routes in this file require login.
+// Everything in this file requires a logged-in user, so we apply the middleware to all routes.
 router.use(requireAuth);
 
 function fail(status, message) {
@@ -34,7 +34,7 @@ async function transaction(work) {
   }
 }
 
-// Check membership before accessing a specific pantry.
+// Check membership of the user agaisnt the pantry ID in the request parameters.
 async function requireMember(req, res, next) {
   const pantryId = Number(req.params.pantryId);
 
@@ -201,9 +201,9 @@ router.post('/invites/accept', async (req, res) => {
   res.json(pantry);
 });
 
-// ---------- PANTRY ITEMS ----------
+// PANTRY ITEMS
 
-// Validate optional dates without allowing impossible calendar dates.
+// Validate dates without timezones, since the database stores them as dates without times.
 function optionalDate(value, label) {
   if (value === undefined || value === null || value === '') {
     return null;
@@ -326,7 +326,7 @@ async function findOrCreateIngredient(client, name) {
   return created.rows[0].id;
 }
 
-// Date is also returned as "date" for your current PantryItem component.
+// Date is also returned as "date" for the current PantryItem component.
 const itemSelect = `
   SELECT
     pi.id,
@@ -473,7 +473,7 @@ router.put(
   }
 );
 
-// Delete this pantry's stock entry, keeping the ingredient catalog.
+// Delete this pantry's stock entry
 router.delete(
   '/pantries/:pantryId/items/:itemId',
   requireMember,
