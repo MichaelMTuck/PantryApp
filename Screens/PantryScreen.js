@@ -1,30 +1,13 @@
 // Displays all the ingredients currently stored in the pantry
 import { useState } from "react";
-import { View, Text, TextInput, FlatList, Button } from "react-native";
+import { View, Text, TextInput, FlatList, Button, StyleSheet } from "react-native";
+import { ITEMS } from "../data/pantryItems";
 import PantryItem from "../Components/PantryItem";
 
-const initialItems = [{
-  id : 0,
-  name: 'obj1',
-  unit: "lbs",
-  quantity: 5.0,
-  date: "10/10/2020"
-}, {
-  id : 1,
-  name: 'obj2',
-  unit: "lbs",
-  quantity: 5.0,
-  date: "10/10/2020"
-}, {
-  id : 2,
-  name: 'obj3',
-  unit: "lbs",
-  quantity: 5.0,
-  date: "10/10/2020"
-}];
+
 
 export default function Pantry() {
-  const [items, setItems] = useState(initialItems);
+  const [items, setItems] = useState(ITEMS);
   const [searchText, setSearchText] = useState("");
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -53,7 +36,7 @@ export default function Pantry() {
   };
 
   return (
-    <View>
+    <View style={styles.container}>
       <Text>Search</Text>
       <TextInput
         placeholder="Search pantry items..."
@@ -61,7 +44,15 @@ export default function Pantry() {
         onChangeText={setSearchText}
       />
 
-      <Text>Add a new item</Text>
+
+      {/* https://reactnative.dev/docs/flatlist?language=typescript */}
+      <FlatList
+        data={filteredItems}
+        renderItem={({ item }) => <PantryItem {...item} />}
+        keyExtractor={item => item.id.toString()}
+      />
+
+       <Text>Add a new item</Text>
       <TextInput placeholder="Name" value={name} onChangeText={setName} />
       <TextInput
         placeholder="Quantity"
@@ -70,18 +61,11 @@ export default function Pantry() {
       />
       <TextInput placeholder="Unit" value={unit} onChangeText={setUnit} />
       <Button title="Add item" onPress={addItem} />
-
-      {/* https://reactnative.dev/docs/flatlist?language=typescript */}
-      <FlatList
-        data={filteredItems}
-        renderItem={({ item }) => <PantryItem {...item} />}
-        keyExtractor={item => item.id.toString()}
-      />
     </View>
   );
 }
 
 
-  const styles = StyleSheet.create({
+const styles = StyleSheet.create({
   container: { flex: 1, padding: 10, backgroundColor: "#f5f5f5" },
 });
