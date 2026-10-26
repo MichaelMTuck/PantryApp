@@ -27,10 +27,17 @@ const initialItems = [{
     const[items, setItems] = useState(initialItems);
     return (
       //https://reactnative.dev/docs/flatlist?language=typescript
-       <FlatList
-        data={initialItems}
-        renderItem={({item}) => <PantryItem {...item} />}
-        keyExtractor={item => item.id}
-      />
+      <View style={styles.container}>
+        <FlatList
+          data={initialItems}
+          renderItem={({item}) => <PantryItem {...item} />}
+          keyExtractor={item => item.id}
+        />
+      </View>
     );
   }
+
+
+  const styles = StyleSheet.create({
+  container: { flex: 1, padding: 10, backgroundColor: "#f5f5f5" },
+});

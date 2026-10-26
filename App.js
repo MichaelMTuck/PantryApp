@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import Home from "./Screens/HomeScreen";
 import Pantry from "./Screens/PantryScreen";
-import Recipes from "./Screens/RecipesScreen";
+import RecipesStack from "./Screens/RecipeStack";
 
 const Tab = createBottomTabNavigator();
 
@@ -25,7 +25,11 @@ export default function App() {
       >
         <Tab.Screen name="Home" component={Home} />
         <Tab.Screen name="Pantry" component={Pantry} />
-        <Tab.Screen name="Recipes" component={Recipes} />
+        <Tab.Screen
+          name="Recipes"
+          component={RecipesStack}
+          options={{ headerShown: false }} // hides the app header, this is because of the way the stack navigator automaitcally draws headers with back buttons
+          />
       </Tab.Navigator>
     </NavigationContainer>
   );
