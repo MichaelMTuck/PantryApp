@@ -17,10 +17,16 @@ export default function PantryItem({id, name, quantity, unit, date}){
 
 const styles = StyleSheet.create({
     card: {
-        padding: 14,
-        flexDirection: "row",
-        marginBottom : 10
-    },
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
 
     left: { flex: 1 },
 });
