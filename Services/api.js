@@ -14,20 +14,33 @@ export async function apiRequest(
     headers['Content-Type'] = 'application/json';
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    method,
-    headers,
-    ...(body !== undefined
-      ? { body: JSON.stringify(body) }
-      : {}),
-  });
+  let response;
 
-  // Logout and delete requests return no response body.
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method,
+      headers,
+      ...(body !== undefined
+        ? { body: JSON.stringify(body) }
+        : {}),
+    });
+  } catch {
+    throw new Error(
+      'Cannot reach the server. Check your connection and Tailscale.'
+    );
+  }
+
   if (response.status === 204) {
     return null;
   }
 
-  const data = await response.json();
+  let data;
+
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error('The server returned an unexpected response.');
+  }
 
   if (!response.ok) {
     const error = new Error(data.error || 'Request failed.');
