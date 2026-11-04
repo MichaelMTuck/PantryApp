@@ -77,7 +77,7 @@ CREATE INDEX pantry_invites_pantry_idx
     ON pantry_invites(pantry_id);
 
 -- INGREDIENT CATALOG
--- A barcode is optional and remains text to preserve leading zeros.
+-- BARCODES ARE OPTIONAL, BUT IF PROVIDED MUST BE UNIQUE.
 CREATE TABLE ingredients (
     id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
@@ -90,7 +90,7 @@ CREATE TABLE ingredients (
 
 CREATE INDEX ingredients_name_idx ON ingredients(lower(name));
 
--- ACTUAL PANTRY STOCK
+-- PANTRY STOCK
 CREATE TABLE pantry_items (
     id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     pantry_id INTEGER NOT NULL
