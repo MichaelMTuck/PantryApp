@@ -9,7 +9,7 @@ export default function PantryItem({id, name, quantity, unit, date, onChangeQuan
         <View style={styles.card}>
             <View style={styles.left}>
                 <Text>{name}</Text>
-                <Text>Expires: {date}</Text>
+                <Text>Expires: {date || "Not provided"}</Text>
             </View>
             <Button title="-" onPress={() => onChangeQuantity(quantity - step)} />
             <Text>

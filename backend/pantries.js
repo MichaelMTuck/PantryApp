@@ -5,7 +5,7 @@ const { requireAuth } = require('./auth');
 
 const router = express.Router();
 
-// Everything in this file requires a logged-in user, so we apply the middleware to all routes.
+// All routes in this file require login.
 router.use(requireAuth);
 
 function fail(status, message) {
@@ -34,7 +34,7 @@ async function transaction(work) {
   }
 }
 
-// Check membership of the user agaisnt the pantry ID in the request parameters.
+// Check membership before accessing a specific pantry.
 async function requireMember(req, res, next) {
   const pantryId = Number(req.params.pantryId);
 
@@ -201,9 +201,9 @@ router.post('/invites/accept', async (req, res) => {
   res.json(pantry);
 });
 
-// PANTRY ITEMS
+// ---------- PANTRY ITEMS ----------
 
-// Validate dates without timezones, since the database stores them as dates without times.
+// Validate optional dates without allowing impossible calendar dates.
 function optionalDate(value, label) {
   if (value === undefined || value === null || value === '') {
     return null;
@@ -326,7 +326,7 @@ async function findOrCreateIngredient(client, name) {
   return created.rows[0].id;
 }
 
-// Date is also returned as "date" for the current PantryItem component.
+// Date is also returned as "date" for your current PantryItem component.
 const itemSelect = `
   SELECT
     pi.id,
@@ -473,7 +473,7 @@ router.put(
   }
 );
 
-// Delete this pantry's stock entry
+// Delete this pantry's stock entry, keeping the ingredient catalog.
 router.delete(
   '/pantries/:pantryId/items/:itemId',
   requireMember,
@@ -491,6 +491,80 @@ router.delete(
     }
 
     res.sendStatus(204);
+  }
+);
+
+// Load recipes belonging to a pantry.
+// Correlated subqueries keep ingredients and steps from duplicating
+// one another when a recipe has several of each.
+const recipeSelect = `
+  SELECT
+    r.id,
+    r.name,
+    r.description,
+    r.servings::float8 AS servings,
+    (r.prep_minutes + r.cook_minutes)::text || ' min' AS time,
+    COALESCE(
+      (
+        SELECT json_agg(
+          ri.quantity::float8::text || ' ' || ri.unit || ' ' || i.name
+          ORDER BY ri.position
+        )
+        FROM pantry_app.recipe_ingredients ri
+        JOIN pantry_app.ingredients i ON i.id = ri.ingredient_id
+        WHERE ri.recipe_id = r.id
+      ),
+      '[]'::json
+    ) AS ingredients,
+    COALESCE(
+      (
+        SELECT json_agg(rs.instruction ORDER BY rs.step_number)
+        FROM pantry_app.recipe_steps rs
+        WHERE rs.recipe_id = r.id
+      ),
+      '[]'::json
+    ) AS steps
+  FROM pantry_app.recipes r
+`;
+
+// List the selected pantry's recipes.
+router.get(
+  '/pantries/:pantryId/recipes',
+  requireMember,
+  async (req, res) => {
+    const result = await pool.query(
+      `${recipeSelect}
+       WHERE r.pantry_id = $1
+       ORDER BY lower(r.name), r.id`,
+      [req.pantryId]
+    );
+
+    res.json(result.rows);
+  }
+);
+
+// Load one recipe without allowing access to another pantry's recipe.
+router.get(
+  '/pantries/:pantryId/recipes/:recipeId',
+  requireMember,
+  async (req, res) => {
+    const recipeId = Number(req.params.recipeId);
+
+    if (!Number.isSafeInteger(recipeId) || recipeId <= 0) {
+      fail(400, 'Invalid recipe ID.');
+    }
+
+    const result = await pool.query(
+      `${recipeSelect}
+       WHERE r.pantry_id = $1 AND r.id = $2`,
+      [req.pantryId, recipeId]
+    );
+
+    if (!result.rowCount) {
+      fail(404, 'Recipe not found.');
+    }
+
+    res.json(result.rows[0]);
   }
 );
 
