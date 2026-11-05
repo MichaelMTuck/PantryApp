@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -6,6 +7,7 @@ import {
   FlatList,
   ScrollView,
   StyleSheet,
+  Pressable
 } from "react-native";
 
 import RecipeCard from "../Components/RecipeCard";
@@ -13,7 +15,9 @@ import { useSession } from "../Services/session";
 import { usePantry } from "../PantryGate";
 import { getRecipes } from "../Services/recipeService";
 
+
 export default function Recipes() {
+  const navigation = useNavigation();
   const { token } = useSession();
   const { selectedPantry } = usePantry();
 
@@ -117,6 +121,20 @@ export default function Recipes() {
           />
         )}
       />
+      <View style={styles.fabWrapper} pointerEvents="box-none"> 
+        
+        <Pressable
+          // pointerEvents="box-none", it makes it so you can only touch it's children componenets
+          onPress={() => navigation.navigate("RecipeAdd")}
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.circleButton,
+            pressed && styles.circleButtonPressed,
+          ]}
+        >
+          <Text style={styles.plus}>+</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -127,4 +145,42 @@ const styles = StyleSheet.create({
   heading: { fontSize: 18, marginTop: 16, marginBottom: 6 },
   line: { fontSize: 15, marginBottom: 6 },
   error: { color: "#b00020", marginBottom: 12 },
+  // For moving our circle to the bottom
+  fabWrapper: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 24,
+    alignItems: "center",
+  },
+  circleButton: {
+    // Feel free to change this, it just needs to have it 
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#2ecc71",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 4,
+    borderColor: "#fff",
+    // iOS shadow
+    // Adds a little hugh around the button, makes it look nice
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    // Android shadow
+    elevation: 8,
+  },
+  // Just makes it darker and slightly smaller
+  circleButtonPressed: {
+    backgroundColor: "#27ae60",
+    transform: [{ scale: 0.92 }],
+  },
+  plus: {
+    color: "#fff",
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: "500",
+  },
 });

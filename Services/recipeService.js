@@ -11,3 +11,11 @@ export function getRecipe(token, pantryId, recipeId) {
     { token }
   );
 }
+
+export function addRecipe(token, pantryId, recipe){
+  return apiRequest( '/pantries/${pantryId}$/', {
+    method: 'POST',
+    token,
+    body : recipe}
+  )
+}

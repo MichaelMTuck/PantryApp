@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import Home from "./Screens/HomeScreen";
 import Pantry from "./Screens/PantryScreen";
-import Recipes from "./Screens/RecipesScreen";
+import RecipeStack from "./Screens/RecipeStack";
 import AuthGate from "./AuthGate";
 import PantryGate from "./PantryGate";
 
@@ -29,7 +29,11 @@ export default function App() {
         >
           <Tab.Screen name="Home" component={Home} />
           <Tab.Screen name="Pantry" component={Pantry} />
-          <Tab.Screen name="Recipes" component={Recipes} />
+          <Tab.Screen 
+            name="Recipes" 
+            component={RecipeStack} //  Provide the entire Stack as the tab component
+            options={{ headerShown: false }} // Hides the double header issue
+          />
         </Tab.Navigator>
         </NavigationContainer>
       </PantryGate>
