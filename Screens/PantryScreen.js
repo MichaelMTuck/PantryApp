@@ -59,6 +59,7 @@ export default function Pantry() {
       setLoading(false);
     }
   }
+
   const [searchText, setSearchText] = useState("");
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -107,58 +108,53 @@ export default function Pantry() {
     }
   };
 
-  // Change one item's quantity, never below 0
   // Save quantity changes to PostgreSQL, never below 0.
-const updateQuantity = async (id, newQuantity) => {
-  if (saving || loading) return;
+  const updateQuantity = async (id, newQuantity) => {
+    if (saving || loading) return;
 
-  const item = items.find((entry) => entry.id === id);
-  if (!item) return;
+    const item = items.find((entry) => entry.id === id);
+    if (!item) return;
 
-  setSaving(true);
-  setError('');
+    setSaving(true);
+    setError('');
 
-  try {
-    const savedItem = await updatePantryItem(
-      token,
-      selectedPantry.id,
-      id,
-      {
-        name: item.name,
-        quantity: Math.max(0, newQuantity),
-        unit: item.unit,
+    try {
+      const savedItem = await updatePantryItem(
+        token,
+        selectedPantry.id,
+        id,
+        {
+          name: item.name,
+          quantity: Math.max(0, newQuantity),
+          unit: item.unit,
 
-        // PUT replaces editable fields, so preserve these values.
-        expiration_date: item.expiration_date,
-        purchased_on: item.purchased_on,
-        total_cost: item.total_cost === null
-          ? null
-          : Number(item.total_cost),
-      }
-    );
+          // PUT replaces editable fields, so preserve these values.
+          expiration_date: item.expiration_date,
+          purchased_on: item.purchased_on,
+          total_cost: item.total_cost === null
+            ? null
+            : Number(item.total_cost),
+        }
+      );
 
-    setItems((current) =>
-      current.map((entry) => entry.id === id ? savedItem : entry)
-    );
-  } catch (err) {
-    setError(err.message);
-  } finally {
-    setSaving(false);
-  }
-};
+      setItems((current) =>
+        current.map((entry) => entry.id === id ? savedItem : entry)
+      );
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-  <View style={styles.container}>
-    {error ? (
-      <Text style={{ color: '#b00020' }}>{error}</Text>
-    ) : null}
+    <View style={styles.container}>
+      {error ? (
+        <Text style={{ color: '#b00020' }}>{error}</Text>
+      ) : null}
 
-    {saving ? <Text>Saving…</Text> : null}
+      {saving ? <Text>Saving…</Text> : null}
 
-    <Text>Search</Text>
-
-    {/* Keep your existing search input, list, and form below. */}
-      
       <Text>Search</Text>
       <TextInput
         placeholder="Search pantry items..."
@@ -167,29 +163,51 @@ const updateQuantity = async (id, newQuantity) => {
       />
 
       <FlatList
-  data={filteredItems}
-  renderItem={({ item }) => (
-    <PantryItem
-      {...item}
-      onChangeQuantity={(q) => updateQuantity(item.id, q)}
-    />
-  )}
-  keyExtractor={item => item.id.toString()}
-  refreshing={loading}
-  onRefresh={refreshItems}
-  ListEmptyComponent={
-    <Text>
-      {loading ? 'Loading…' : 'No matching pantry items.'}
-    </Text>
-  }
-/>
+        data={filteredItems}
+        renderItem={({ item }) => (
+          <PantryItem
+            {...item}
+            onChangeQuantity={(q) => updateQuantity(item.id, q)}
+          />
+        )}
+        keyExtractor={item => item.id.toString()}
+        refreshing={loading}
+        onRefresh={refreshItems}
+        ListEmptyComponent={
+          <Text>
+            {loading ? 'Loading…' : 'No matching pantry items.'}
+          </Text>
+        }
+      />
 
       <Text>Add a new item</Text>
-      <TextInput placeholder="Name" value={name} onChangeText={setName} />
-      <TextInput placeholder="Quantity" value={quantity} onChangeText={setQuantity} />
+
+      {/* Name input */}
+      <Text style={styles.label}>Name</Text>
+      <TextInput
+        placeholder="Name"
+        value={name}
+        onChangeText={setName}
+      />
+
+      {/* Quantity input */}
+      <Text style={styles.label}>Quantity</Text>
+      <TextInput
+        placeholder="Quantity"
+        value={quantity}
+        onChangeText={setQuantity}
+      />
 
       {/* Button shows current unit and tapping it opens the list */}
-      <Button title={`Unit: ${unit}`} onPress={() => setShowUnits(true)} />
+      <Text style={styles.label}>Unit</Text>
+      <View style={styles.unitButton}>
+        <Button
+          title={`${unit}  ▼`}
+          onPress={() => setShowUnits(true)}
+          color="#FFFFFF"
+        />
+      </View>
+
       <Modal visible={showUnits} animationType="slide">
         <View style={styles.container}>
           {UNIT_NAMES.map(u => (
@@ -206,14 +224,32 @@ const updateQuantity = async (id, newQuantity) => {
       </Modal>
 
       <Button
-  title={saving ? "Saving…" : "Add item"}
-  onPress={addItem}
-  disabled={saving || loading}
-/>
+        title={saving ? "Saving…" : "Add item"}
+        onPress={addItem}
+        disabled={saving || loading}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 10, backgroundColor: "#f5f5f5" },
+  container: {
+    flex: 1,
+    padding: 10,
+    backgroundColor: "#f5f5f5"
+  },
+
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 5,
+    color: "#444444",
+  },
+
+  unitButton: {
+    backgroundColor: "#739C79",
+    borderRadius: 8,
+    paddingVertical: 4,
+    marginVertical: 8,
+  },
 });
