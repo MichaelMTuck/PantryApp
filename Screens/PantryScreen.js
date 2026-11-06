@@ -171,7 +171,10 @@ export default function Pantry() {
         
         <Pressable
           onPress={() => hideEmpty ? setHideEmpty(false) : setHideEmpty(true)}
-          style={[styles.hideEmptyFalse, hideEmpty && styles.hideEmptyTrue]}
+          style={({ pressed }) => [
+            styles.hideEmptyTrue,
+            pressed && styles.circleButtonPressed,
+         ]}
           // To hide any items that are empty
         >
           {hideEmpty && (
@@ -361,14 +364,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#739C79",
     fontWeight: 600,
     fontSize: 15,
-    color: "739C79",
+    color: "black",
     borderWidth: 1,
     borderRadius: 3
   },
   hideEmptyFalse:{
     fontWeight: 600,
     fontSize: 15,
-    color: "739C79",
+    color: "black",
     borderWidth: 1,
     borderRadius: 3,
     backgroundColor: "#739C79",
