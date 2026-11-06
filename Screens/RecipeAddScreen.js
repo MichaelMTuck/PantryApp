@@ -83,15 +83,16 @@ export default function RecipeAdd(){
     // Makes sure the form is filled out before trying to submit
     const validate = () => {
         if (!title.trim()) return "Give your recipe a title.";
-
         const minutes = Number(time);
+
         if (!time.trim() || !Number.isInteger(minutes) || minutes <= 0) {
         return "Enter the time in whole minutes, like 45.";
         }
 
         if (!steps.some((s) => s.text.trim())) return "Add at least one step.";
-
         if (!ingredients.some((s) => s.text.trim())) return "Add at least ingredient.";
+        if(servings === 0) return "Servings have to be larger than 0.";
+
         return "";
     };
 
@@ -121,13 +122,15 @@ export default function RecipeAdd(){
                 steps: ["Mix ingredients.", "Cook on a hot pan."]
                 }
             */
+            const ingredientString = ingredients.map(s => s.text.trim()).filter(Boolean).join(";");
+            // filter(Boolean) gets rid of "", bool vals and other stuff we don't want
             console.log({
                 name: title.trim(),
-                time: `${time} min`,
-                servings: servings,
-                ingredients: ingredients.map(ing => ing.text),
-                steps: steps.map(step => step.text)
-             })
+                time: Number(time),
+                servings: Number(servings),
+                ingredients: ingredientString,
+                steps: steps.map((step) => step.text).filter(Boolean)
+            })
             await addRecipe(token, selectedPantry.id, {
                 name: title.trim(),
                 time: `${time} min`,
@@ -146,7 +149,6 @@ export default function RecipeAdd(){
     return(
    <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
         contentContainerStyle={styles.container}
@@ -157,7 +159,7 @@ export default function RecipeAdd(){
         <Text style={styles.label}>Title</Text>
         <TextInput
           style={styles.input}
-          placeholder="Grandma's tomato soup"
+          placeholder="Grandma's pecan pie"
           value={title}
           onChangeText={setTitle}
           returnKeyType="next"
@@ -172,6 +174,16 @@ export default function RecipeAdd(){
           onChangeText={(v) => setTime(v.replace(/[^0-9]/g, ""))}
           keyboardType="number-pad" // Makes it so it only shows the number pad, makes it easier
         />
+        <Text style={styles.label}>Servings</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="4"
+          value={servings}
+          // Digits only, standard copy and paste code for clean up
+          onChangeText={(v) => setServings(v.replace(/[^0-9]/g, ""))}
+          keyboardType="number-pad" // Makes it so it only shows the number pad, makes it easier
+        />
+
 
         <Text style={styles.label}>Ingredients</Text>
         {ingredients.map((ingredient, index) => (
