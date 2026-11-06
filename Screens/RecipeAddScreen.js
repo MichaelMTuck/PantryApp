@@ -192,7 +192,7 @@ export default function RecipeAdd(){
 
             <TextInput
               style={[styles.input, styles.stepInput]}
-              placeholder="Add an ingredient"
+              placeholder="2 Cups of Flower"
               value={ingredient.text}
               onChangeText={(v) => updateIngredients(ingredient.id, v)}
               multiline // Lets the text scroll down
