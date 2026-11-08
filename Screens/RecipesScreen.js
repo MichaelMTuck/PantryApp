@@ -1,5 +1,9 @@
-import { useEffect, useState } from "react";
-import { useNavigation } from '@react-navigation/native';
+import { useCallback, useState, useEffect } from "react";
+import {
+  useNavigation,
+  useFocusEffect,
+} from "@react-navigation/native";
+
 import {
   View,
   Text,
@@ -21,32 +25,34 @@ export default function Recipes() {
   const { token } = useSession();
   const { selectedPantry } = usePantry();
 
-  const [recipes, setRecipes] = useState([]);
-  const [selectedRecipe, setSelectedRecipe] = useState(null);
+  const [recipes, setRecipes] = useState([]);;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    let active = true;
+  // Reload the recipes list when coming back from detail or add recipe screen
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
 
-    setLoading(true);
-    setError("");
+      setLoading(true);
+      setError("");
 
-    getRecipes(token, selectedPantry.id)
-      .then((result) => {
-        if (active) setRecipes(result);
-      })
-      .catch((err) => {
-        if (active) setError(err.message);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+      getRecipes(token, selectedPantry.id)
+        .then((result) => {
+          if (active) setRecipes(result);
+        })
+        .catch((err) => {
+          if (active) setError(err.message);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
 
-    return () => {
-      active = false;
-    };
-  }, [token, selectedPantry.id]);
+      return () => {
+        active = false;
+      };
+    }, [token, selectedPantry.id])
+  );
 
   async function refreshRecipes() {
     setLoading(true);
@@ -62,7 +68,8 @@ export default function Recipes() {
     }
   }
 
-  if (selectedRecipe) {
+  // Commented out the in line detail view for a selected recipe
+  /* if (selectedRecipe) {
     return (
       <ScrollView contentContainerStyle={styles.container}>
         <Button
@@ -95,7 +102,7 @@ export default function Recipes() {
         ))}
       </ScrollView>
     );
-  }
+  } */
 
   return (
     <View style={styles.container}>
@@ -116,8 +123,9 @@ export default function Recipes() {
           <RecipeCard
             name={item.name}
             time={item.time}
+            
             // Display details returned by the database API.
-            onPress={() => setSelectedRecipe(item)}
+            onPress={() => navigation.navigate("RecipeDetails", {recipeId: item.id,})}
           />
         )}
       />

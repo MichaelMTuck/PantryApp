@@ -13,7 +13,7 @@ export function getRecipe(token, pantryId, recipeId) {
 }
 
 export function addRecipe(token, pantryId, recipe){
-  return apiRequest( '/pantries/${pantryId}$/', {
+  return apiRequest(`/pantries/${pantryId}/recipes`, {
     method: 'POST',
     token,
     body : recipe}

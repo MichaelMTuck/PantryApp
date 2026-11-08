@@ -1,40 +1,109 @@
 // Displays detailed information about a specific recipe
-import { ScrollView, Text, StyleSheet } from "react-native";
-import { RECIPES } from "../data/recipes";
+import { useEffect, useState } from "react";
+import {ActivityIndicator, Button, ScrollView, Text, StyleSheet, View,} from "react-native";
+
+import { getRecipe } from "../Services/recipeService";
+import { useSession } from "../Services/session";
+import { usePantry } from "../PantryGate";
+
+
 
 export default function RecipeDetails({ route }){
     const { recipeId } = route.params; // This infomration is given from the navigation in the recipe screen
-    const recipe = RECIPES.find((r) => r.id === recipeId) // How we find our proper recipe
+    
+    const { token } = useSession();
+    const { selectedPantry } = usePantry();
 
-    if(!recipe) return <Text>Error: Recipe not found</Text> // Safe gaurd
+    const [recipe, setRecipe] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [retry, setRetry] = useState(0);
 
-    return(
-        // Our one parrent element 
-        <ScrollView contentContainerStyle={styles.container}> 
-            <Text style={styles.title}>{recipe.name}</Text>
-            <Text style={styles.time}>{recipe.time}</Text>
+useEffect(() => {
+    let active = true;
 
-            <Text style={styles.heading}>Ingredients</Text>
-            {recipe.ingredients.map((ingr => (
-                // We can use each ingrediant as it's own key in the list
-                <Text key={ingr}>*{ingr}</Text>
-            )))}
+    setLoading(true);
+    setError("");
+    setRecipe(null);
 
-            <Text style={styles.heading}>Steps</Text>
-            {recipe.steps.map((step, i) =>
-                // Our itterator, i for the steps and "step" for the actual text
-                // First pos is the actual item, second is always the itterator
-                <Text key={i} style={styles.line}>{i+1}. {step}</Text>
-            )}
-        </ScrollView>
+    getRecipe(token, selectedPantry.id, recipeId)
+      .then((result) => {
+        if (active) setRecipe(result);
+      })
+      .catch((err) => {
+        if (active) setError(err.message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
+    return () => {
+      active = false;
+    };
+  }, [token, selectedPantry.id, recipeId, retry]);
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" />
+        <Text>Loading recipe…</Text>
+      </View>
     );
+  }
+
+  if (error || !recipe) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.error}>
+          {error || "Recipe not found."}
+        </Text>
+
+        <Button
+          title="Try again"
+          onPress={() => setRetry((current) => current + 1)}
+        />
+      </View>
+    );
+  }
+
+  return (
+    // The parent element
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>{recipe.name}</Text>
+      <Text style={styles.time}>{recipe.time}</Text>
+      <Text>Servings: {recipe.servings}</Text>
+
+      {recipe.description ? (
+        <Text style={styles.line}>{recipe.description}</Text>
+      ) : null}
+
+      <Text style={styles.heading}>Ingredients</Text>
+
+      {recipe.ingredients.map((ingredient, index) => (
+        <Text key={index} style={styles.line}>
+          • {ingredient}
+        </Text>
+      ))}
+
+      <Text style={styles.heading}>Steps</Text>
+
+      {recipe.steps.map((step, index) => (
+        
+        // The index gives each step its displayed number.
+        <Text key={index} style={styles.line}>
+          {index + 1}. {step}
+        </Text>
+      ))}
+    </ScrollView>
+  );
 }
 
 const styles = StyleSheet.create({
   container: { padding: 16 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24, gap: 12 },
   title: { fontSize: 24 },
   time: {  marginBottom: 16 },
   heading: { fontSize: 18, marginTop: 16, marginBottom: 6 },
   line: { fontSize: 15, marginBottom: 4 },
+  error: { color: "red", fontSize: 16 },
 });

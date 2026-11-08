@@ -33,7 +33,7 @@ export default function RecipeAdd(){
     const [title, setTitle] = useState('');
     const [time, setTime] = useState('');
     const [ingredients, setIngredients] = useState(() => [makeIngr()]);
-    const [servings, setServings] = useState(0);
+    const [servings, setServings] = useState('');
 
     const [steps, setSteps] = useState(() => [makeStep()]);
 
@@ -75,7 +75,7 @@ export default function RecipeAdd(){
         setTitle("");
         setTime("");
         setSteps([makeStep()]);
-        setServings(0);
+        setServings('');
         setIngredients([makeIngr()])
         setError("");
     };
@@ -91,7 +91,16 @@ export default function RecipeAdd(){
 
         if (!steps.some((s) => s.text.trim())) return "Add at least one step.";
         if (!ingredients.some((s) => s.text.trim())) return "Add at least ingredient.";
-        if(servings === 0) return "Servings have to be larger than 0.";
+        
+        // Reject empty input for servings and 0
+        const servingCount = Number(servings);
+        if (
+          !servings.trim() ||
+          !Number.isFinite(servingCount) ||
+          servingCount <= 0
+        ) {
+          return "Enter a number of servings greater than 0.";
+        }
 
         return "";
     };
@@ -122,23 +131,27 @@ export default function RecipeAdd(){
                 steps: ["Mix ingredients.", "Cook on a hot pan."]
                 }
             */
-            const ingredientString = ingredients.map(s => s.text.trim()).filter(Boolean).join(";");
-            // filter(Boolean) gets rid of "", bool vals and other stuff we don't want
-            console.log({
-                name: title.trim(),
-                time: Number(time),
-                servings: Number(servings),
-                ingredients: ingredientString,
-                steps: steps.map((step) => step.text).filter(Boolean)
-            })
-            await addRecipe(token, selectedPantry.id, {
-                name: title.trim(),
-                time: `${time} min`,
-                servings: servings,
-                ingredients: ingredients.map(ing => ing.text),
-                steps: steps.map(step => step.text)
-             });
+            const recipe = {
+              name: title.trim(),
+              time: Number(time),
+              servings: Number(servings),
+
+              ingredients: ingredients
+                .map((ingredient) => ingredient.text.trim())
+                .filter(Boolean)
+                .join(";"),
+
+              steps: steps
+                .map((step) => step.text.trim())
+                .filter(Boolean)
+                .join(";"),
+            };
+
+            await addRecipe(token, selectedPantry.id, recipe);
+
             resetForm();
+            navigation.goBack();
+            
         } catch (err) {
             setError(err.message || "Couldn't save the recipe. Try again.");
         } finally {
