@@ -17,7 +17,9 @@ import { useSession } from './Services/session';
 import {
   createPantry,
   getPantries,
+  acceptPantryInvite,
 } from './Services/pantryService';
+import HouseholdPanel from './Components/HouseholdPanel';
 
 const PantryContext = createContext(null);
 
@@ -40,6 +42,8 @@ export default function PantryGate({ children }) {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  const [joining, setJoining] = useState(false);
 
   async function loadPantries() {
     setLoading(true);
@@ -47,7 +51,8 @@ export default function PantryGate({ children }) {
 
     try {
       const result = await getPantries(token);
-      setPantries(result);
+      const uniquePantries = Array.from(new Map(result.map((item) => [item.id, item])).values());
+      setPantries(uniquePantries);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -70,7 +75,7 @@ export default function PantryGate({ children }) {
 
     try {
       const pantry = await createPantry(token, name.trim());
-      setPantries((current) => [...current, pantry]);
+      setPantries((current) => [...current.filter((item) => item.id !== pantry.id), pantry]);
       setName('');
       setSelectedPantry(pantry);
     } catch (err) {
@@ -80,17 +85,49 @@ export default function PantryGate({ children }) {
     }
   }
 
+  async function handleJoinWithInvite() {
+  const code = inviteCode.trim().toLowerCase();
+
+  if (!/^[a-f0-9]{64}$/.test(code)) {
+    setError('Enter the full invite code.');
+    return;
+  }
+
+  setJoining(true);
+  setError('');
+
+  try {
+    const pantry = await acceptPantryInvite(token, code);
+
+    setPantries((current) => {
+      if (current.some((item) => item.id === pantry.id)) {
+        return current;
+      }
+      return [...current, pantry];
+    });
+
+    setInviteCode('');
+    setSelectedPantry(pantry);
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setJoining(false);
+  }
+}
+
   if (selectedPantry) {
     return (
       <PantryContext.Provider value={{ selectedPantry }}>
         <View style={{ flex: 1 }}>
-          <View style={{ padding: 10 }}>
-            <Text>Pantry: {selectedPantry.name}</Text>
-            <Button
-              title="Change pantry"
-              onPress={() => setSelectedPantry(null)}
-            />
-          </View>
+          <HouseholdPanel
+          key={selectedPantry.id}
+          pantry={selectedPantry}
+        />
+
+        <View style={{ paddingHorizontal: 10, paddingBottom: 8 }}>
+          <Text>Pantry: {selectedPantry.name}</Text>
+          <Button title="Change pantry" onPress={() => setSelectedPantry(null)} />
+        </View>
 
           {/* Remount screens when switching to a different pantry. */}
           <View key={selectedPantry.id} style={{ flex: 1 }}>
@@ -143,6 +180,24 @@ export default function PantryGate({ children }) {
         onPress={handleCreate}
         disabled={creating}
       />
+      <Text style={{ marginTop: 24 }}>Join a pantry with an invite</Text>
+
+      <TextInput
+        placeholder="Paste invite code"
+        value={inviteCode}
+        onChangeText={setInviteCode}
+        autoCapitalize="none"
+        autoCorrect={false}
+        style={{ borderWidth: 1, padding: 12, marginVertical: 12 }}
+      />
+
+      <Button
+        title={joining ? 'Joining…' : 'Join pantry'}
+        onPress={handleJoinWithInvite}
+        disabled={joining || creating || loading}
+      />
+
     </ScrollView>
+    
   );
 }

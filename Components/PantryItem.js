@@ -29,7 +29,7 @@ export default function PantryItem({
 
     if (nextQuantity > 1000000000) return;
 
-    onChangeQuantity(nextQuantity);
+    onChangeQuantity(direction * step);
   }
 
     return (

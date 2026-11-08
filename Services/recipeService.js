@@ -19,3 +19,13 @@ export function addRecipe(token, pantryId, recipe){
     body : recipe}
   )
 }
+
+export function cookRecipe(token, pantryId, recipeId) {
+  return apiRequest(
+    `/pantries/${pantryId}/recipes/${recipeId}/cook`,
+    {
+      method: 'POST',
+      token,
+    }
+  );
+}

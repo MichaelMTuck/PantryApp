@@ -1,5 +1,5 @@
 // Displays all the ingredients currently stored in the pantry
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { View, Text, TextInput, FlatList, Button, Modal, StyleSheet, Pressable, KeyboardAvoidingView, Platform} from "react-native";
 import { UNITS } from "../data/units";
 import PantryItem from "../Components/PantryItem";
@@ -10,6 +10,7 @@ import {
   getPantryItems,
   addPantryItem,
   updatePantryItem,
+  adjustPantryQuantity,
 } from "../Services/pantryService";
 
 const UNIT_NAMES = Object.keys(UNITS);
@@ -24,6 +25,7 @@ export default function Pantry() {
   const [error, setError] = useState('');
   const [showAddItem, setShowAddItem] = useState(false);
   const [hideEmpty, setHideEmpty] = useState(false);
+  const quantityRequestRunning = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -119,45 +121,23 @@ export default function Pantry() {
 
   // Saves quantity changes to the postgresql server, handle edge cases
   const updateQuantity = async (id, newQuantity) => {
-    if (saving || loading) return;
+    if (saving || loading || quantityRequestRunning.current) return;
 
-    const item = items.find((entry) => entry.id === id);
-    if (!item) return;
-
-    if (
-      !Number.isFinite(newQuantity) ||
-      newQuantity < 0 ||
-      newQuantity > 1000000000
-    ) {
-      setError("Enter a valid quantity between 0 and 1000000000.");
+    if (!Number.isFinite(newQuantity) || newQuantity === 0) {
+      setError("Enter a valid non-zero change.");
       return;
     }
-
-    const roundedQuantity =
-      Math.round(newQuantity * 10000) / 10000;
-
-    if (roundedQuantity === Number(item.quantity)) return;
-
+    quantityRequestRunning.current = true;
     setSaving(true);
-    setError('');
+    setError("");
+    
 
     try {
-      const savedItem = await updatePantryItem(
+      const savedItem = await adjustPantryQuantity(
         token,
         selectedPantry.id,
         id,
-        {
-          name: item.name,
-          quantity: roundedQuantity,
-          unit: item.unit,
-
-          // PUT replaces editable fields, so preserve these values.
-          expiration_date: item.expiration_date,
-          purchased_on: item.purchased_on,
-          total_cost: item.total_cost === null
-            ? null
-            : Number(item.total_cost),
-        }
+        newQuantity
       );
 
       setItems((current) =>
@@ -167,6 +147,7 @@ export default function Pantry() {
       setError(err.message);
     } finally {
       setSaving(false);
+      quantityRequestRunning.current = false;
     }
   };
 

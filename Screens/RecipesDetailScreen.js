@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import {ActivityIndicator, Button, ScrollView, Text, StyleSheet, View,} from "react-native";
 
-import { getRecipe } from "../Services/recipeService";
+import { cookRecipe, getRecipe } from "../Services/recipeService";
 import { useSession } from "../Services/session";
 import { usePantry } from "../PantryGate";
 
@@ -18,6 +18,8 @@ export default function RecipeDetails({ route }){
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [retry, setRetry] = useState(0);
+    const [cooking, setCooking] = useState(false);
+    const [cookMessage, setCookMessage] = useState("");
 
 useEffect(() => {
     let active = true;
@@ -42,6 +44,24 @@ useEffect(() => {
     };
   }, [token, selectedPantry.id, recipeId, retry]);
 
+    async function handleCook() {
+        setCooking(true);
+        setCookMessage("");
+
+        try {
+            const result = await cookRecipe(
+            token,
+            selectedPantry.id,
+            recipeId
+            );
+
+            setCookMessage(result.message);
+        } catch (err) {
+            setCookMessage(err.message);
+        } finally {
+            setCooking(false);
+        }
+    }
   if (loading) {
     return (
       <View style={styles.center}>
@@ -94,6 +114,19 @@ useEffect(() => {
           {index + 1}. {step}
         </Text>
       ))}
+
+      <View style={{ marginTop: 20 }}>
+        <Button
+            title={cooking ? "Cooking…" : "Cook recipe"}
+            onPress={handleCook}
+            disabled={cooking}
+        />
+
+        {cookMessage ? (
+            <Text style={{ marginTop: 10 }}>{cookMessage}</Text>
+        ) : null}
+        </View>
+
     </ScrollView>
   );
 }

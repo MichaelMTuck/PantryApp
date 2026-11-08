@@ -568,4 +568,130 @@ router.get(
   }
 );
 
+// Method for cooking a recipe and deducting its ingredients from the pantry.
+router.post(
+  '/pantries/:pantryId/recipes/:recipeId/cook',
+  requireMember,
+  async (req, res, next) => {
+    const pantryId = req.pantryId;
+    const recipeId = Number(req.params.recipeId);
+    const client = await pool.connect();
+
+    try {
+      if (!Number.isSafeInteger(recipeId) || recipeId <= 0) {
+        fail(400, 'Invalid recipe ID.');
+      }
+
+      await client.query('BEGIN');
+
+      // Double check that the recipe belongs to the pantry in question
+      const recipeResult = await client.query(
+        `SELECT id
+         FROM pantry_app.recipes
+         WHERE id = $1 AND pantry_id = $2`,
+        [recipeId, pantryId]
+      );
+
+      if (!recipeResult.rowCount) {
+        fail(404, 'Recipe not found.');
+      }
+
+      // Read the all the quantities required by this recipe from the database.
+      const requiredResult = await client.query(
+        `SELECT ingredient_id, quantity, unit
+         FROM pantry_app.recipe_ingredients
+         WHERE recipe_id = $1
+         ORDER BY position`,
+        [recipeId]
+      );
+
+      if (!requiredResult.rowCount) {
+        fail(400, 'This recipe has no ingredients.');
+      }
+
+      // Lock the matching pantry stock rows while checking quantities to prevent race conditions.
+      const ingredientIds = requiredResult.rows.map(
+        (ingredient) => ingredient.ingredient_id
+      );
+
+      const stockResult = await client.query(
+        `SELECT id, ingredient_id, quantity, unit
+         FROM pantry_app.pantry_items
+         WHERE pantry_id = $1
+           AND ingredient_id = ANY($2::int[])
+         FOR UPDATE`,
+        [pantryId, ingredientIds]
+      );
+
+      const stockByIngredient = new Map(
+        stockResult.rows.map((item) => [
+          Number(item.ingredient_id),
+          item,
+        ])
+      );
+
+      const problems = [];
+
+      for (const required of requiredResult.rows) {
+        const stock = stockByIngredient.get(
+          Number(required.ingredient_id)
+        );
+
+        if (!stock) {
+          problems.push(`Missing ingredient ID ${required.ingredient_id}`);
+          continue;
+        }
+
+        if (
+          stock.unit.trim().toLowerCase() !==
+          required.unit.trim().toLowerCase()
+        ) {
+          problems.push(
+            `Ingredient ID ${required.ingredient_id} uses ${stock.unit} ` +
+            `in the pantry but ${required.unit} in the recipe`
+          );
+          continue;
+        }
+
+        if (Number(stock.quantity) < Number(required.quantity)) {
+          problems.push(
+            `Not enough of ingredient ID ${required.ingredient_id}: ` +
+            `${stock.quantity} ${stock.unit} available; ` +
+            `${required.quantity} ${required.unit} required`
+          );
+        }
+      }
+
+      if (problems.length > 0) {
+        const error = new Error(problems.join('; '));
+        error.status = 409;
+        throw error;
+      }
+
+      // Deduct if it passes all validation checks.
+      for (const required of requiredResult.rows) {
+        await client.query(
+          `UPDATE pantry_app.pantry_items
+           SET quantity = quantity - $1
+           WHERE pantry_id = $2
+             AND ingredient_id = $3`,
+          [required.quantity, pantryId, required.ingredient_id]
+        );
+      }
+
+      await client.query('COMMIT');
+
+      res.json({
+        cooked: true,
+        message: 'Recipe cooked. Pantry quantities were updated.',
+      });
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      next(error);
+    } finally {
+      client.release();
+    }
+  }
+);
+
 module.exports = router;
