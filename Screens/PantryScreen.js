@@ -50,6 +50,7 @@ export default function Pantry() {
 
   async function refreshItems() {
     setLoading(true);
+    if (saving || loading) return;
     setError('');
 
     try {
@@ -116,12 +117,26 @@ export default function Pantry() {
     }
   };
 
-  // Save quantity changes to PostgreSQL, never below 0.
+  // Saves quantity changes to the postgresql server, handle edge cases
   const updateQuantity = async (id, newQuantity) => {
     if (saving || loading) return;
 
     const item = items.find((entry) => entry.id === id);
     if (!item) return;
+
+    if (
+      !Number.isFinite(newQuantity) ||
+      newQuantity < 0 ||
+      newQuantity > 1000000000
+    ) {
+      setError("Enter a valid quantity between 0 and 1000000000.");
+      return;
+    }
+
+    const roundedQuantity =
+      Math.round(newQuantity * 10000) / 10000;
+
+    if (roundedQuantity === Number(item.quantity)) return;
 
     setSaving(true);
     setError('');
@@ -133,7 +148,7 @@ export default function Pantry() {
         id,
         {
           name: item.name,
-          quantity: Math.max(0, newQuantity),
+          quantity: roundedQuantity,
           unit: item.unit,
 
           // PUT replaces editable fields, so preserve these values.
@@ -197,6 +212,7 @@ export default function Pantry() {
         renderItem={({ item }) => (
           <PantryItem
             {...item}
+            disabled={saving || loading}
             onChangeQuantity={(q) => updateQuantity(item.id, q)}
           />
         )}

@@ -1,22 +1,59 @@
 import { View, Text, Button, StyleSheet } from "react-native";
-import { UNITS } from "../data/units";
+import { getQuantityStep } from "../data/units";
 
 // Represents a single item in the pantry
-export default function PantryItem({ id, name, quantity, unit, date, onChangeQuantity }) {
-    const step = UNITS[unit];
+export default function PantryItem({
+  id,
+  name,
+  quantity,
+  unit,
+  date,
+  onChangeQuantity,
+  disabled = false,
+}) {
+  const step = getQuantityStep(unit);
+  const amount = Number(quantity);
+
+  const canAdjust =
+    step !== null &&
+    Number.isFinite(amount) &&
+    amount >= 0;
+
+  function changeQuantity(direction) {
+    if (disabled || !canAdjust) return;
+
+    // Match to the databases' four decimal places.
+    const nextQuantity = Math.round(
+      Math.max(0, amount + direction * step) * 10000
+    ) / 10000;
+
+    if (nextQuantity > 1000000000) return;
+
+    onChangeQuantity(nextQuantity);
+  }
 
     return (
         <View style={styles.card}>
             <View style={styles.left}>
                 <Text>{name}</Text>
                 <Text>Expires: {date || "Not provided"}</Text>
+                {!canAdjust ? (
+                <Text>
+                    Unknown unit or quantity, controls unavailable for this unit or quantity.
+                </Text>
+                ) : null}
             </View>
 
             <View style={styles.quantityControls}>
                 <View style={styles.quantityButton}>
                     <Button
                         title="−"
-                        onPress={() => onChangeQuantity(quantity - step)}
+                        onPress={() => changeQuantity(-1)}
+                        disabled={
+                            disabled || 
+                            !canAdjust ||
+                            amount - step < 0
+                        }
                         color="#FFFFFF"
                     />
                 </View>
@@ -28,7 +65,12 @@ export default function PantryItem({ id, name, quantity, unit, date, onChangeQua
                 <View style={styles.quantityButton}>
                     <Button
                         title="+"
-                        onPress={() => onChangeQuantity(quantity + step)}
+                        onPress={() => changeQuantity(1)}
+                        disabled={
+                            disabled || 
+                            !canAdjust ||
+                            amount + step > 1000000000
+                        }
                         color="#FFFFFF"
                     />
                 </View>

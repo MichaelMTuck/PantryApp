@@ -34,13 +34,23 @@ export default function Recipes() {
     useCallback(() => {
       let active = true;
 
+      console.log("Recipe list focused; pantry:", selectedPantry.id);
+
       setLoading(true);
       setError("");
 
       getRecipes(token, selectedPantry.id)
         .then((result) => {
-          if (active) setRecipes(result);
+          console.log(
+            "Recipes returned:",
+            result.map((recipe) => ({
+              id: recipe.id,
+              name: recipe.name,
+            }))
+        );
+        if (active) setRecipes(result);
         })
+        
         .catch((err) => {
           if (active) setError(err.message);
         })
@@ -129,6 +139,7 @@ export default function Recipes() {
           />
         )}
       />
+
       <View style={styles.fabWrapper} pointerEvents="box-none"> 
         
         <Pressable
