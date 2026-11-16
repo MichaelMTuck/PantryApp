@@ -19,7 +19,6 @@ import {
   getPantries,
   acceptPantryInvite,
 } from './Services/pantryService';
-import HouseholdPanel from './Components/HouseholdPanel';
 
 const PantryContext = createContext(null);
 
@@ -86,53 +85,47 @@ export default function PantryGate({ children }) {
   }
 
   async function handleJoinWithInvite() {
-  const code = inviteCode.trim().toLowerCase();
+    const code = inviteCode.trim().toLowerCase();
 
-  if (!/^[a-f0-9]{64}$/.test(code)) {
-    setError('Enter the full invite code.');
-    return;
+    if (!/^[a-f0-9]{64}$/.test(code)) {
+      setError('Enter the full invite code.');
+      return;
+    }
+
+    setJoining(true);
+    setError('');
+
+    try {
+      const pantry = await acceptPantryInvite(token, code);
+
+      setPantries((current) => {
+        if (current.some((item) => item.id === pantry.id)) {
+          return current;
+        }
+        return [...current, pantry];
+      });
+
+      setInviteCode('');
+      setSelectedPantry(pantry);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setJoining(false);
+    }
   }
-
-  setJoining(true);
-  setError('');
-
-  try {
-    const pantry = await acceptPantryInvite(token, code);
-
-    setPantries((current) => {
-      if (current.some((item) => item.id === pantry.id)) {
-        return current;
-      }
-      return [...current, pantry];
-    });
-
-    setInviteCode('');
-    setSelectedPantry(pantry);
-  } catch (err) {
-    setError(err.message);
-  } finally {
-    setJoining(false);
-  }
-}
 
   if (selectedPantry) {
     return (
-      <PantryContext.Provider value={{ selectedPantry }}>
-        <View style={{ flex: 1 }}>
-          <HouseholdPanel
-          key={selectedPantry.id}
-          pantry={selectedPantry}
-        />
-
-        <View style={{ paddingHorizontal: 10, paddingBottom: 8 }}>
-          <Text>Pantry: {selectedPantry.name}</Text>
-          <Button title="Change pantry" onPress={() => setSelectedPantry(null)} />
-        </View>
-
-          {/* Remount screens when switching to a different pantry. */}
-          <View key={selectedPantry.id} style={{ flex: 1 }}>
-            {children}
-          </View>
+      <PantryContext.Provider
+        value={{
+          selectedPantry,
+          // Called from Home screen to go back to pantry picker
+          changePantry: () => setSelectedPantry(null),
+        }}
+      >
+        {/* Remount screens when switching to a different pantry. */}
+        <View key={selectedPantry.id} style={{ flex: 1 }}>
+          {children}
         </View>
       </PantryContext.Provider>
     );
@@ -198,6 +191,6 @@ export default function PantryGate({ children }) {
       />
 
     </ScrollView>
-    
+
   );
 }

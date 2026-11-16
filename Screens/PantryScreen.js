@@ -1,6 +1,7 @@
 // Displays all the ingredients currently stored in the pantry
 import { useEffect, useState, useRef } from "react";
 import { View, Text, TextInput, FlatList, Button, Modal, StyleSheet, Pressable, KeyboardAvoidingView, Platform} from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { UNITS } from "../data/units";
 import PantryItem from "../Components/PantryItem";
 import { useSession } from "../Services/session";
@@ -14,6 +15,21 @@ import {
 } from "../Services/pantryService";
 
 const UNIT_NAMES = Object.keys(UNITS);
+
+// Formats as YYYY-MM-DD
+const formatDate = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+// Turns a YYYY-MM-DD string back into a Date so picker can show it
+const parseDate = (str) => {
+  if (!str) return new Date();
+  const [y, m, d] = str.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
 
 export default function Pantry() {
   const { token } = useSession();
@@ -71,6 +87,15 @@ export default function Pantry() {
   const [unit, setUnit] = useState(UNIT_NAMES[0]);
   const [showUnits, setShowUnits] = useState(false);
 
+  // Optional expiration date (empty string = no date)
+  const [expirationDate, setExpirationDate] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Called whenever user picks a date in the calendar
+  const onDateChange = (event, selected) => {
+    if (selected) setExpirationDate(formatDate(selected));
+  };
+
   const filteredItems = items.filter(item =>
     {
       const matchesSearch = item.name.toLowerCase().includes(searchText.toLowerCase());
@@ -104,7 +129,8 @@ export default function Pantry() {
         name: name.trim(),
         quantity: amount,
         unit,
-        expiration_date: null,
+        // YYYY-MM-DD string or null when no date is picked
+        expiration_date: expirationDate || null,
       });
 
       setItems((current) => [savedItem, ...current]);
@@ -112,6 +138,8 @@ export default function Pantry() {
       setName('');
       setQuantity('');
       setUnit(UNIT_NAMES[0]);
+      setExpirationDate('');
+      setShowDatePicker(false);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -279,6 +307,49 @@ export default function Pantry() {
           </View>
         </Modal>
 
+        {/* Optional expiration date */}
+        <Text style={styles.label}>Expiration date (optional)</Text>
+        <View style={styles.dateRow}>
+          <View style={[styles.unitButton, styles.dateButton]}>
+            <Button
+              title={expirationDate || "Select date"}
+              onPress={() => setShowDatePicker(true)}
+              color="#FFFFFF"
+            />
+          </View>
+          {expirationDate !== "" && (
+            <Pressable onPress={() => setExpirationDate("")}>
+              <Text style={styles.cancelButton}>Clear</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* Calendar shows in a centered card */}
+        <Modal
+          visible={showDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setShowDatePicker(false)}
+          >
+            {/* Touching card doesn't close it */}
+            <Pressable style={styles.pickerCard} onPress={() => {}}>
+              <DateTimePicker
+                value={parseDate(expirationDate)}
+                mode="date"
+                display="inline"
+                themeVariant="light"
+                onValueChange={onDateChange}
+                onDismiss={() => setShowDatePicker(false)}
+              />
+              <Button title="Done" onPress={() => setShowDatePicker(false)} />
+            </Pressable>
+          </Pressable>
+        </Modal>
+
         <Button
           title={saving ? "Saving…" : "Add item"}
           onPress={addItem}
@@ -337,6 +408,30 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 4,
     marginVertical: 8,
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  dateButton: {
+    flex: 1,
+  },
+  // Dimmed background
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  // White card that holds calendar
+  pickerCard: {
+    width: "100%",
+    maxWidth: 380,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 12,
   },
   searchHeader: {
     flexDirection: "row",
