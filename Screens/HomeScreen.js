@@ -3,6 +3,7 @@ import { ScrollView, Text, Button, View } from "react-native";
 
 import { usePantry } from "../PantryGate";
 import HouseholdPanel from "../Components/HouseholdPanel";
+import PantryNotifications from "../Components/PantryNotifications";
 
 export default function Home() {
   const { selectedPantry, changePantry } = usePantry();
@@ -17,7 +18,16 @@ export default function Home() {
         <Button title="Change pantry" onPress={changePantry} />
       </View>
 
-      <HouseholdPanel key={selectedPantry.id} pantry={selectedPantry} />
+      {/* Low stock, expiration alerts. Key resets state when pantry changes */}
+      <PantryNotifications
+        key={`notifications-${selectedPantry.id}`}
+        pantry={selectedPantry}
+      />
+
+      <HouseholdPanel
+        key={`household-${selectedPantry.id}`}
+        pantry={selectedPantry}
+      />
     </ScrollView>
   );
 }
