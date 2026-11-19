@@ -16,6 +16,7 @@ const icons = { Home: "home", Pantry: "basket", Recipes: "restaurant" };
 export default function App() {
   return (
     <AuthGate>
+      <PushRegistrar />
       <PantryGate>
         {/* https://dev.to/fonyuygita/building-veli-a-complete-react-native-tab-navigation-tutorial-gnm */}
         <NavigationContainer>
