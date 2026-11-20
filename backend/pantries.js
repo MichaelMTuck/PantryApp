@@ -382,9 +382,14 @@ router.post(
              unit,
              expiration_date,
              purchased_on,
-             total_cost
+             total_cost,
+             cost_basis_quantity
            )
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         VALUES (
+           $1, $2, $3, $4, $5, $6, $7,
+           CASE WHEN $7::numeric IS NOT NULL AND $3::numeric >= 0.0001
+                THEN $3::numeric ELSE NULL END
+         )
          RETURNING id`,
         [
           req.pantryId,
@@ -446,7 +451,17 @@ router.put(
            unit = $5,
            expiration_date = $6,
            purchased_on = $7,
-           total_cost = $8
+           total_cost = $8,
+           cost_basis_quantity = CASE
+             WHEN $8::numeric IS NULL THEN NULL
+             WHEN cost_basis_quantity IS NOT NULL
+                  AND total_cost = $8::numeric
+                  AND ingredient_id = $3
+                  AND unit = $5
+               THEN cost_basis_quantity
+             WHEN $4::numeric >= 0.0001 THEN $4::numeric
+             ELSE NULL
+           END
          WHERE id = $1 AND pantry_id = $2`,
         [
           itemId,
@@ -568,129 +583,283 @@ router.get(
   }
 );
 
-// Method for cooking a recipe and deducting its ingredients from the pantry.
+function cookUnit(unit) {
+  const cleaned = unit.trim().toLowerCase();
+  const aliases = new Map([
+    ['item', 'items'], ['each', 'items'],
+    ['cups', 'cup'], ['pints', 'pint'],
+    ['quarts', 'quart'], ['gallons', 'gallon'],
+    ['ounces', 'oz'], ['ounce', 'oz'],
+    ['lb', 'lbs'], ['pound', 'lbs'], ['pounds', 'lbs'],
+    ['teaspoon', 'tsp'], ['teaspoons', 'tsp'],
+    ['tablespoon', 'tbsp'], ['tablespoons', 'tbsp'],
+  ]);
+  return aliases.get(cleaned) ?? cleaned;
+}
+
+function readRecipeId(req) {
+  const id = Number(req.params.recipeId);
+
+  if (!Number.isInteger(id) || id < 1 || id > 2147483647) {
+    fail(400, 'Invalid recipe ID.');
+  }
+
+  return id;
+}
+
+function formatStockAmount(ticks) {
+  const whole = ticks / 10000n;
+  const fraction = String(ticks % 10000n)
+    .padStart(4, '0')
+    .replace(/0+$/, '');
+
+  return fraction ? `${whole}.${fraction}` : String(whole);
+}
+
+// Find the stock rows and amounts needed for one full recipe.
+async function planRecipeStock(client, pantryId, recipeId, lock = false) {
+  const recipe = await client.query(
+    `SELECT id FROM pantry_app.recipes
+     WHERE id = $1 AND pantry_id = $2`,
+    [recipeId, pantryId]
+  );
+
+  if (!recipe.rowCount) fail(404, 'Recipe not found in this pantry.');
+
+  const required = await client.query(
+    `SELECT ri.ingredient_id, i.name, ri.unit,
+            (ri.quantity * 10000)::bigint AS ticks
+     FROM pantry_app.recipe_ingredients ri
+     JOIN pantry_app.ingredients i ON i.id = ri.ingredient_id
+     WHERE ri.recipe_id = $1`,
+    [recipeId]
+  );
+
+  if (!required.rowCount) fail(400, 'This recipe has no ingredients.');
+
+  const stock = await client.query(
+     `SELECT id, ingredient_id, unit, total_cost, cost_basis_quantity,
+            (quantity * 10000)::bigint AS ticks
+     FROM pantry_app.pantry_items
+     WHERE pantry_id = $1
+       AND ingredient_id = ANY($2::int[])
+       AND quantity > 0
+       AND (
+         expiration_date IS NULL OR
+         expiration_date >= (now() AT TIME ZONE 'America/New_York')::date
+       )
+     ORDER BY expiration_date NULLS LAST, id
+     ${lock ? 'FOR UPDATE' : ''}`,
+    [pantryId, required.rows.map((row) => row.ingredient_id)]
+  );
+
+  const needs = new Map();
+
+  for (const row of required.rows) {
+    const unit = cookUnit(row.unit);
+    const key = `${row.ingredient_id}:${unit}`;
+    const entry = needs.get(key) ?? { name: row.name, unit, ticks: 0n };
+    entry.ticks += BigInt(row.ticks);
+    needs.set(key, entry);
+  }
+
+  const batches = new Map();
+
+  for (const row of stock.rows) {
+    const key = `${row.ingredient_id}:${cookUnit(row.unit)}`;
+    if (!batches.has(key)) batches.set(key, []);
+    batches.get(key).push(row);
+  }
+
+  const deductions = [];
+  const shortages = [];
+
+  for (const [key, need] of needs) {
+    let remaining = need.ticks;
+
+    for (const row of batches.get(key) ?? []) {
+      if (remaining === 0n) break;
+
+      const available = BigInt(row.ticks);
+      const take = available < remaining ? available : remaining;
+      deductions.push({ row, take });
+      remaining -= take;
+    }
+
+    if (remaining > 0n) {
+      shortages.push(
+        `${need.name}: short ${formatStockAmount(remaining)} ${need.unit}`
+      );
+    }
+  }
+
+  return { deductions, shortages };
+}
+
+// Deduct one full recipe, starting with the soonest-expiring stock.
 router.post(
   '/pantries/:pantryId/recipes/:recipeId/cook',
   requireMember,
-  async (req, res, next) => {
+  async (req, res) => {
     const pantryId = req.pantryId;
-    const recipeId = Number(req.params.recipeId);
-    const client = await pool.connect();
+    const recipeId = readRecipeId(req);
 
-    try {
-      if (!Number.isSafeInteger(recipeId) || recipeId <= 0) {
-        fail(400, 'Invalid recipe ID.');
-      }
-
-      await client.query('BEGIN');
-
-      // Double check that the recipe belongs to the pantry in question
-      const recipeResult = await client.query(
-        `SELECT id
-         FROM pantry_app.recipes
-         WHERE id = $1 AND pantry_id = $2`,
-        [recipeId, pantryId]
+    await transaction(async (client) => {
+      const { deductions, shortages } = await planRecipeStock(
+        client, pantryId, recipeId, true
       );
 
-      if (!recipeResult.rowCount) {
-        fail(404, 'Recipe not found.');
+      if (shortages.length) {
+        fail(409, shortages.join('; '));
       }
 
-      // Read the all the quantities required by this recipe from the database.
-      const requiredResult = await client.query(
-        `SELECT ingredient_id, quantity, unit
-         FROM pantry_app.recipe_ingredients
-         WHERE recipe_id = $1
-         ORDER BY position`,
-        [recipeId]
-      );
-
-      if (!requiredResult.rowCount) {
-        fail(400, 'This recipe has no ingredients.');
-      }
-
-      // Lock the matching pantry stock rows while checking quantities to prevent race conditions.
-      const ingredientIds = requiredResult.rows.map(
-        (ingredient) => ingredient.ingredient_id
-      );
-
-      const stockResult = await client.query(
-        `SELECT id, ingredient_id, quantity, unit
-         FROM pantry_app.pantry_items
-         WHERE pantry_id = $1
-           AND ingredient_id = ANY($2::int[])
-         FOR UPDATE`,
-        [pantryId, ingredientIds]
-      );
-
-      const stockByIngredient = new Map(
-        stockResult.rows.map((item) => [
-          Number(item.ingredient_id),
-          item,
-        ])
-      );
-
-      const problems = [];
-
-      for (const required of requiredResult.rows) {
-        const stock = stockByIngredient.get(
-          Number(required.ingredient_id)
-        );
-
-        if (!stock) {
-          problems.push(`Missing ingredient ID ${required.ingredient_id}`);
-          continue;
-        }
-
-        if (
-          stock.unit.trim().toLowerCase() !==
-          required.unit.trim().toLowerCase()
-        ) {
-          problems.push(
-            `Ingredient ID ${required.ingredient_id} uses ${stock.unit} ` +
-            `in the pantry but ${required.unit} in the recipe`
-          );
-          continue;
-        }
-
-        if (Number(stock.quantity) < Number(required.quantity)) {
-          problems.push(
-            `Not enough of ingredient ID ${required.ingredient_id}: ` +
-            `${stock.quantity} ${stock.unit} available; ` +
-            `${required.quantity} ${required.unit} required`
-          );
-        }
-      }
-
-      if (problems.length > 0) {
-        const error = new Error(problems.join('; '));
-        error.status = 409;
-        throw error;
-      }
-
-      // Deduct if it passes all validation checks.
-      for (const required of requiredResult.rows) {
+      for (const { row, take } of deductions) {
         await client.query(
           `UPDATE pantry_app.pantry_items
-           SET quantity = quantity - $1
-           WHERE pantry_id = $2
-             AND ingredient_id = $3`,
-          [required.quantity, pantryId, required.ingredient_id]
+           SET quantity = quantity - $1::numeric
+           WHERE id = $2 AND pantry_id = $3`,
+          [formatStockAmount(take), row.id, pantryId]
         );
       }
+    });
 
-      await client.query('COMMIT');
+    res.json({
+      cooked: true,
+      message: 'Recipe cooked. Pantry quantities were updated. Oldest items deducted first.',
+    });
+  }
+);
 
-      res.json({
-        cooked: true,
-        message: 'Recipe cooked. Pantry quantities were updated.',
-      });
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
-      next(error);
-    } finally {
-      client.release();
+const shoppingPath = '/pantries/:pantryId/shopping-list/items';
+
+const shoppingSelect = `
+  SELECT si.id, i.name, si.quantity::float8 AS quantity,
+         si.unit, si.checked
+  FROM pantry_app.shopping_list_items si
+  JOIN pantry_app.ingredients i ON i.id = si.ingredient_id
+`;
+
+const pantryShoppingListId = `
+  SELECT id FROM pantry_app.shopping_lists
+  WHERE pantry_id = $1
+  ORDER BY id
+  LIMIT 1
+`;
+
+router.get(shoppingPath, requireMember, async (req, res) => {
+  const result = await pool.query(
+    `${shoppingSelect}
+     WHERE si.shopping_list_id = (${pantryShoppingListId})
+     ORDER BY si.checked, lower(i.name), si.id`,
+    [req.pantryId]
+  );
+
+  res.json(result.rows);
+});
+
+router.post(shoppingPath, requireMember, async (req, res) => {
+  const { name, quantity, unit } = req.body ?? {};
+
+  if (typeof name !== 'string' || !name.trim() || name.trim().length > 150) {
+    fail(400, 'Enter an item name of 1–150 characters.');
+  }
+  if (typeof unit !== 'string' || !unit.trim() || unit.trim().length > 30) {
+    fail(400, 'Enter a unit of 1–30 characters.');
+  }
+  if (typeof quantity !== 'number' || !Number.isFinite(quantity) ||
+      quantity < 0.0001 || quantity > 1000000000) {
+    fail(400, 'Enter a positive quantity.');
+  }
+
+  const item = await transaction(async (client) => {
+    await client.query(
+      'SELECT id FROM pantry_app.pantries WHERE id = $1 FOR UPDATE',
+      [req.pantryId]
+    );
+
+    let list = await client.query(pantryShoppingListId, [req.pantryId]);
+    if (!list.rowCount) {
+      list = await client.query(
+        `INSERT INTO pantry_app.shopping_lists (pantry_id)
+         VALUES ($1) RETURNING id`,
+        [req.pantryId]
+      );
     }
+
+    const ingredientId = await findOrCreateIngredient(client, name.trim());
+    const inserted = await client.query(
+      `INSERT INTO pantry_app.shopping_list_items
+         (shopping_list_id, ingredient_id, quantity, unit)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, quantity::float8 AS quantity, unit, checked`,
+      [list.rows[0].id, ingredientId, quantity, unit.trim()]
+    );
+
+    return { ...inserted.rows[0], name: name.trim() };
+  });
+
+  res.status(201).json(item);
+});
+
+router.patch(`${shoppingPath}/:itemId`, requireMember, async (req, res) => {
+  const id = itemIdFromRequest(req);
+  const { checked } = req.body ?? {};
+  if (typeof checked !== 'boolean') fail(400, 'checked must be true or false.');
+
+  const saved = await pool.query(
+    `UPDATE pantry_app.shopping_list_items
+     SET checked = $3
+     WHERE shopping_list_id = (${pantryShoppingListId}) AND id = $2
+     RETURNING id, checked`,
+    [req.pantryId, id, checked]
+  );
+
+  if (!saved.rowCount) fail(404, 'Shopping item not found.');
+  res.json(saved.rows[0]);
+});
+
+router.delete(`${shoppingPath}/:itemId`, requireMember, async (req, res) => {
+  const removed = await pool.query(
+    `DELETE FROM pantry_app.shopping_list_items
+     WHERE shopping_list_id = (${pantryShoppingListId}) AND id = $2`,
+    [req.pantryId, itemIdFromRequest(req)]
+  );
+
+  if (!removed.rowCount) fail(404, 'Shopping item not found.');
+  res.sendStatus(204);
+});
+
+router.get(
+  '/pantries/:pantryId/recipes/:recipeId/cost',
+  requireMember,
+  async (req, res) => {
+    const { deductions, shortages } = await planRecipeStock(
+      pool,
+      req.pantryId,
+      readRecipeId(req)
+    );
+
+    let total = 0;
+    let missingPrices = false;
+
+    for (const { row, take } of deductions) {
+      if (row.total_cost === null || row.cost_basis_quantity === null) {
+        missingPrices = true;
+        continue;
+      }
+
+      const amountUsed = Number(take) / 10000;
+      total += amountUsed * Number(row.total_cost)
+        / Number(row.cost_basis_quantity);
+    }
+
+    res.json({
+      estimated_cost: shortages.length || missingPrices
+        ? null
+        : Math.round(total * 100) / 100,
+      shortages,
+      missing_prices: missingPrices,
+    });
   }
 );
 

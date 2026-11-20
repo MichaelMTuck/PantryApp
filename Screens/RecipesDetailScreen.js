@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import {ActivityIndicator, Button, ScrollView, Text, StyleSheet, View,} from "react-native";
 
-import { cookRecipe, getRecipe } from "../Services/recipeService";
+import { cookRecipe, getRecipe, getRecipeCost } from "../Services/recipeService";
 import { useSession } from "../Services/session";
 import { usePantry } from "../PantryGate";
 
@@ -10,7 +10,7 @@ import { usePantry } from "../PantryGate";
 
 export default function RecipeDetails({ route }){
     const { recipeId } = route.params; // This infomration is given from the navigation in the recipe screen
-    
+
     const { token } = useSession();
     const { selectedPantry } = usePantry();
 
@@ -20,6 +20,9 @@ export default function RecipeDetails({ route }){
     const [retry, setRetry] = useState(0);
     const [cooking, setCooking] = useState(false);
     const [cookMessage, setCookMessage] = useState("");
+    const [recipeCost, setRecipeCost] = useState(null);
+    const [costError, setCostError] = useState("");
+    const [costRevision, setCostRevision] = useState(0);
 
 useEffect(() => {
     let active = true;
@@ -44,6 +47,26 @@ useEffect(() => {
     };
   }, [token, selectedPantry.id, recipeId, retry]);
 
+  useEffect(() => {
+    let active = true;
+
+    setRecipeCost(null);
+    setCostError("");
+
+    getRecipeCost(token, selectedPantry.id, recipeId)
+      .then((result) => {
+        if (active) setRecipeCost(result);
+      })
+      .catch((err) => {
+        if (active) setCostError(err.message);
+      });
+
+    return () => {
+      active = false;
+  };
+
+  }, [token, selectedPantry.id, recipeId, retry, costRevision]);
+
     async function handleCook() {
         setCooking(true);
         setCookMessage("");
@@ -56,6 +79,7 @@ useEffect(() => {
             );
 
             setCookMessage(result.message);
+            setCostRevision((current) => current + 1);
         } catch (err) {
             setCookMessage(err.message);
         } finally {
@@ -93,6 +117,18 @@ useEffect(() => {
       <Text style={styles.time}>{recipe.time}</Text>
       <Text>Servings: {recipe.servings}</Text>
 
+      <Text style={styles.line}>
+        {costError
+          ? `Cost unavailable: ${costError}`
+          : !recipeCost
+            ? "Estimating cost…"
+            : recipeCost.shortages.length > 0
+              ? `Cost unavailable: ${recipeCost.shortages.join("; ")}`
+              : recipeCost.missing_prices
+                ? "Cost unavailable: some pantry stock has no purchase price."
+                : `Estimated cost: $${recipeCost.estimated_cost.toFixed(2)} per batch`}
+      </Text>
+
       {recipe.description ? (
         <Text style={styles.line}>{recipe.description}</Text>
       ) : null}
@@ -108,7 +144,7 @@ useEffect(() => {
       <Text style={styles.heading}>Steps</Text>
 
       {recipe.steps.map((step, index) => (
-        
+
         // The index gives each step its displayed number.
         <Text key={index} style={styles.line}>
           {index + 1}. {step}

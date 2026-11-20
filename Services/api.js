@@ -39,7 +39,7 @@ export async function apiRequest(
   try {
     data = await response.json();
   } catch {
-    throw new Error('The server returned an unexpected response.');
+    throw new Error(`Unexpected server response (HTTP ${response.status}) for ${method} ${path}`);
   }
 
   if (!response.ok) {

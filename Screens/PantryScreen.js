@@ -84,6 +84,7 @@ export default function Pantry() {
   const [searchText, setSearchText] = useState("");
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [totalCost, setTotalCost] = useState("");
   const [unit, setUnit] = useState(UNIT_NAMES[0]);
   const [showUnits, setShowUnits] = useState(false);
 
@@ -99,9 +100,9 @@ export default function Pantry() {
   const filteredItems = items.filter(item =>
     {
       const matchesSearch = item.name.toLowerCase().includes(searchText.toLowerCase());
-      // When hideEmpty is true 
+      // When hideEmpty is true
       const hasStock = !hideEmpty || Number(item.quantity) > 0;
-      
+
       return matchesSearch && hasStock;
     }
   );
@@ -121,6 +122,17 @@ export default function Pantry() {
       return;
     }
 
+    const priceText = totalCost.trim();
+    const price = priceText === "" ? null : Number(priceText);
+
+    if (
+      price !== null &&
+      (!Number.isFinite(price) || price < 0 || price > 1000000000 || amount <= 0)
+    ) {
+      setError("Enter a valid nonnegative purchase price and a positive quantity.");
+      return;
+    }
+
     setSaving(true);
     setError('');
 
@@ -131,12 +143,14 @@ export default function Pantry() {
         unit,
         // YYYY-MM-DD string or null when no date is picked
         expiration_date: expirationDate || null,
+        total_cost: price,
       });
 
       setItems((current) => [savedItem, ...current]);
 
       setName('');
       setQuantity('');
+      setTotalCost('');
       setUnit(UNIT_NAMES[0]);
       setExpirationDate('');
       setShowDatePicker(false);
@@ -158,7 +172,7 @@ export default function Pantry() {
     quantityRequestRunning.current = true;
     setSaving(true);
     setError("");
-    
+
 
     try {
       const savedItem = await adjustPantryQuantity(
@@ -192,7 +206,7 @@ export default function Pantry() {
 
       <View style={styles.searchHeader}>
         <Text style={styles.searchLabel}>Search</Text>
-        
+
         <Pressable
           onPress={() => hideEmpty ? setHideEmpty(false) : setHideEmpty(true)}
           style={({ pressed }) => [
@@ -237,7 +251,7 @@ export default function Pantry() {
 
       {!showAddItem && (
       // Hideable button to show the add item option
-      <View style={styles.fabWrapper} pointerEvents="box-none"> 
+      <View style={styles.fabWrapper} pointerEvents="box-none">
       <Pressable
           onPress={() => setShowAddItem(true)}
           hitSlop={8} // Increase hit box
@@ -278,6 +292,16 @@ export default function Pantry() {
           placeholder="Quantity"
           value={quantity}
           onChangeText={setQuantity}
+          keyboardType="decimal-pad"
+          style={styles.textInput}
+        />
+
+        {/* Price Input */}
+        <Text style={styles.label}>Total purchase price (optional)</Text>
+        <TextInput
+          placeholder="e.g. 8.00"
+          value={totalCost}
+          onChangeText={setTotalCost}
           keyboardType="decimal-pad"
           style={styles.textInput}
         />

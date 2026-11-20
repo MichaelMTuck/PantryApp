@@ -29,3 +29,10 @@ export function cookRecipe(token, pantryId, recipeId) {
     }
   );
 }
+
+export function getRecipeCost(token, pantryId, recipeId) {
+  return apiRequest(
+    `/pantries/${pantryId}/recipes/${recipeId}/cost`,
+    { token }
+  );
+}
