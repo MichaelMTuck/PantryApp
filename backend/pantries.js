@@ -2,6 +2,7 @@ const express = require('express');
 const { randomBytes, createHash } = require('node:crypto');
 const pool = require('./db');
 const { requireAuth } = require('./auth');
+const { validateRecipe } = require('./recipeInput');
 
 const router = express.Router();
 
@@ -488,6 +489,59 @@ router.put(
   }
 );
 
+
+router.patch(
+  '/pantries/:pantryId/items/:itemId/quantity',
+  requireMember,
+  async (req, res) => {
+    const itemId = itemIdFromRequest(req);
+    const change = req.body?.change;
+
+    if (
+      typeof change !== 'number' ||
+      !Number.isFinite(change) ||
+      Math.abs(change) > 1000000000
+    ) {
+      fail(400, 'Enter a valid quantity change.');
+    }
+
+    const delta = Math.round(change * 10000) / 10000;
+    if (delta === 0) fail(400, 'Quantity change is too small.');
+
+    const item = await transaction(async (client) => {
+      const updated = await client.query(
+        `UPDATE pantry_app.pantry_items
+         SET quantity = GREATEST(0, quantity + $3::numeric)
+         WHERE pantry_id = $1 AND id = $2
+           AND quantity + $3::numeric <= 1000000000
+         RETURNING id`,
+        [req.pantryId, itemId, delta]
+      );
+
+      if (!updated.rowCount) {
+        const existing = await client.query(
+          `SELECT id FROM pantry_app.pantry_items
+           WHERE pantry_id = $1 AND id = $2`,
+          [req.pantryId, itemId]
+        );
+
+        if (!existing.rowCount) fail(404, 'Pantry batch not found.');
+        fail(400, 'Quantity would exceed the maximum.');
+      }
+
+      const result = await client.query(
+        `${itemSelect} WHERE pi.pantry_id = $1 AND pi.id = $2`,
+        [req.pantryId, itemId]
+      );
+
+      return result.rows[0];
+    });
+
+    res.json(item);
+  }
+);
+
+
 // Delete this pantry's stock entry, keeping the ingredient catalog.
 router.delete(
   '/pantries/:pantryId/items/:itemId',
@@ -860,6 +914,152 @@ router.get(
       shortages,
       missing_prices: missingPrices,
     });
+  }
+);
+
+
+// Create a recipe with its ingredients and steps.
+router.post(
+  '/pantries/:pantryId/recipes',
+  requireMember,
+  async (req, res) => {
+    const recipe = validateRecipe(req.body);
+
+    const saved = await transaction(async (client) => {
+      const result = await client.query(
+        `INSERT INTO pantry_app.recipes
+           (
+             pantry_id,
+             created_by,
+             name,
+             prep_minutes,
+             cook_minutes,
+             servings
+           )
+         VALUES ($1, $2, $3, 0, $4, $5)
+         RETURNING id`,
+        [
+          req.pantryId,
+          req.user.id,
+          recipe.name,
+          recipe.time,
+          recipe.servings,
+        ]
+      );
+
+      const recipeId = result.rows[0].id;
+
+      for (const [index, ingredient] of recipe.ingredients.entries()) {
+        const ingredientId = await findOrCreateIngredient(
+          client,
+          ingredient.name
+        );
+
+        await client.query(
+          `INSERT INTO pantry_app.recipe_ingredients
+             (
+               recipe_id,
+               ingredient_id,
+               quantity,
+               unit,
+               note,
+               position
+             )
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            recipeId,
+            ingredientId,
+            ingredient.quantity,
+            ingredient.unit,
+            ingredient.note,
+            index + 1,
+          ]
+        );
+      }
+
+      for (const [index, instruction] of recipe.steps.entries()) {
+        await client.query(
+          `INSERT INTO pantry_app.recipe_steps
+             (recipe_id, step_number, instruction)
+           VALUES ($1, $2, $3)`,
+          [recipeId, index + 1, instruction]
+        );
+      }
+
+      const details = await client.query(
+        `${recipeSelect}
+         WHERE r.id = $1 AND r.pantry_id = $2`,
+        [recipeId, req.pantryId]
+      );
+
+      return details.rows[0];
+    });
+
+    res.status(201).json(saved);
+  }
+);
+
+router.get(
+  '/pantries/:pantryId/recipe-recommendations',
+  requireMember,
+  async (req, res) => {
+    const result = await pool.query(
+      `WITH local_day AS (
+         SELECT (now() AT TIME ZONE 'America/New_York')::date AS today
+       )
+       SELECT r.id, r.name,
+              i.id AS ingredient_id, i.name AS ingredient,
+              ri.unit AS recipe_unit, pi.unit AS stock_unit,
+              to_char(pi.expiration_date, 'YYYY-MM-DD') AS expires
+       FROM pantry_app.recipes r
+       JOIN pantry_app.recipe_ingredients ri ON ri.recipe_id = r.id
+       JOIN pantry_app.ingredients i ON i.id = ri.ingredient_id
+       JOIN pantry_app.pantry_items pi
+         ON pi.pantry_id = r.pantry_id
+        AND pi.ingredient_id = ri.ingredient_id
+       CROSS JOIN local_day d
+       WHERE r.pantry_id = $1
+         AND pi.quantity > 0
+         AND pi.expiration_date BETWEEN d.today AND d.today + 3`,
+      [req.pantryId]
+    );
+
+    const recipes = new Map();
+
+    for (const row of result.rows) {
+      if (cookUnit(row.recipe_unit) !== cookUnit(row.stock_unit)) continue;
+
+      if (!recipes.has(row.id)) {
+        recipes.set(row.id, {
+          id: row.id,
+          name: row.name,
+          earliest: row.expires,
+          ingredients: new Map(),
+        });
+      }
+
+      const recipe = recipes.get(row.id);
+      recipe.ingredients.set(row.ingredient_id, row.ingredient);
+
+      if (row.expires < recipe.earliest) {
+        recipe.earliest = row.expires;
+      }
+    }
+
+    const recommendations = [...recipes.values()]
+      .sort((a, b) =>
+        a.earliest.localeCompare(b.earliest) ||
+        b.ingredients.size - a.ingredients.size ||
+        a.name.localeCompare(b.name) ||
+        a.id - b.id
+      )
+      .slice(0, 5)
+      .map(({ ingredients, ...recipe }) => ({
+        ...recipe,
+        ingredients: [...ingredients.values()].sort(),
+      }));
+
+    res.json(recommendations);
   }
 );
 

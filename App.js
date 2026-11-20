@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Home from "./Screens/HomeScreen";
 import Pantry from "./Screens/PantryScreen";
 import RecipeStack from "./Screens/RecipeStack";
+import ShoppingListScreen from "./Screens/ShoppingListScreen";
 import AuthGate from "./AuthGate";
 import PantryGate from "./PantryGate";
 import PushRegistrar from "./Components/PushRegistrar";
@@ -31,6 +32,7 @@ export default function App() {
         >
           <Tab.Screen name="Home" component={Home} />
           <Tab.Screen name="Pantry" component={Pantry} />
+          <Tab.Screen name="Shopping" component={ShoppingListScreen} />
           <Tab.Screen
             name="Recipes"
             component={RecipeStack} //  Provide the entire Stack as the tab component

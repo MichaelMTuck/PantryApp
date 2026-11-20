@@ -36,3 +36,10 @@ export function getRecipeCost(token, pantryId, recipeId) {
     { token }
   );
 }
+
+export function getRecommendedRecipes(token, pantryId) {
+  return apiRequest(
+    `/pantries/${pantryId}/recipe-recommendations`,
+    { token }
+  );
+}

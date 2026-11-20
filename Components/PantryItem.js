@@ -9,6 +9,7 @@ export default function PantryItem({
   unit,
   date,
   onChangeQuantity,
+  onDelete,
   disabled = false,
 }) {
   const step = getQuantityStep(unit);
@@ -37,6 +38,7 @@ export default function PantryItem({
             <View style={styles.left}>
                 <Text>{name}</Text>
                 <Text>Expires: {date || "Not provided"}</Text>
+                <Button title="Delete batch" color="#b00020" onPress={onDelete} disabled={disabled} />
                 {!canAdjust ? (
                 <Text>
                     Unknown unit or quantity, controls unavailable for this unit or quantity.
@@ -50,7 +52,7 @@ export default function PantryItem({
                         title="−"
                         onPress={() => changeQuantity(-1)}
                         disabled={
-                            disabled || 
+                            disabled ||
                             !canAdjust ||
                             amount - step < 0
                         }
@@ -67,7 +69,7 @@ export default function PantryItem({
                         title="+"
                         onPress={() => changeQuantity(1)}
                         disabled={
-                            disabled || 
+                            disabled ||
                             !canAdjust ||
                             amount + step > 1000000000
                         }

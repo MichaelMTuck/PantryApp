@@ -1,6 +1,6 @@
 // Displays all the ingredients currently stored in the pantry
 import { useEffect, useState, useRef } from "react";
-import { View, Text, TextInput, FlatList, Button, Modal, StyleSheet, Pressable, KeyboardAvoidingView, Platform} from "react-native";
+import { Alert, View, Text, TextInput, FlatList, Button, Modal, StyleSheet, Pressable, KeyboardAvoidingView, Platform} from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { UNITS } from "../data/units";
 import PantryItem from "../Components/PantryItem";
@@ -193,6 +193,38 @@ export default function Pantry() {
     }
   };
 
+  function confirmDeleteBatch(item) {
+    if (saving || loading || quantityRequestRunning.current) return;
+
+    Alert.alert(
+      "Delete batch?",
+      `Remove this ${item.quantity} ${item.unit} batch of ${item.name} from the shared pantry?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            if (quantityRequestRunning.current) return;
+            quantityRequestRunning.current = true;
+            setSaving(true);
+            setError("");
+
+            try {
+              await deletePantryItem(token, selectedPantry.id, item.id);
+              setItems((current) => current.filter((row) => row.id !== item.id));
+            } catch (err) {
+              setError(err.message);
+            } finally {
+              quantityRequestRunning.current = false;
+              setSaving(false);
+            }
+          },
+        },
+      ]
+    );
+  }
+
   return (
     <KeyboardAvoidingView
     style={styles.container}
@@ -237,6 +269,7 @@ export default function Pantry() {
             {...item}
             disabled={saving || loading}
             onChangeQuantity={(q) => updateQuantity(item.id, q)}
+            onDelete={() => confirmDeleteBatch(item)}
           />
         )}
         keyExtractor={item => item.id.toString()}
