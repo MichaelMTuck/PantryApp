@@ -4,6 +4,7 @@ import {
   Button,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +16,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import { apiRequest } from './Services/api';
 import { SessionContext } from './Services/session';
+import { COLORS } from './data/theme';
 
 // Store the session token securely, never the user's password.
 const TOKEN_KEY = 'pantry-session-token';
@@ -196,11 +198,13 @@ export default function AuthGate({ children }) {
               Signed in as {session.user.display_name}
             </Text>
 
-            <Button
-              title="Log out"
+            <Pressable
               onPress={logout}
               disabled={busy}
-            />
+              style={[styles.logoutButton, busy && styles.logoutButtonDisabled]}
+            >
+              <Text style={styles.logoutText}>Log out</Text>
+            </Pressable>
           </View>
 
           {error ? (
@@ -352,10 +356,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    backgroundColor: COLORS.headerBackground,
   },
   accountName: {
     flex: 1,
+    color: COLORS.headerText,
+    fontWeight: '600',
+  },
+  logoutButton: {
+    borderWidth: 1,
+    borderColor: COLORS.headerText,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  logoutButtonDisabled: {
+    opacity: 0.5,
+  },
+  logoutText: {
+    color: COLORS.headerText,
+    fontWeight: '600',
   },
 });

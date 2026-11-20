@@ -1,5 +1,6 @@
 import { View, Text, Button, StyleSheet } from "react-native";
 import { getQuantityStep } from "../data/units";
+import { COLORS } from "../data/theme";
 
 // Represents a single item in the pantry
 export default function PantryItem({
@@ -56,7 +57,7 @@ export default function PantryItem({
                             !canAdjust ||
                             amount - step < 0
                         }
-                        color="#FFFFFF"
+                        color={COLORS.blueText}
                     />
                 </View>
 
@@ -73,7 +74,7 @@ export default function PantryItem({
                             !canAdjust ||
                             amount + step > 1000000000
                         }
-                        color="#FFFFFF"
+                        color={COLORS.blueText}
                     />
                 </View>
             </View>
@@ -107,7 +108,7 @@ const styles = StyleSheet.create({
     },
 
     quantityButton: {
-        backgroundColor: "#739C79",
+        backgroundColor: COLORS.blue,
         borderRadius: 8,
         overflow: "hidden",
     },
