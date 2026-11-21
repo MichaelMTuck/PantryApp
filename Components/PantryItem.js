@@ -10,6 +10,7 @@ export default function PantryItem({
   date,
   onChangeQuantity,
   onDelete,
+  onEdit,
   disabled = false,
 }) {
   const step = getQuantityStep(unit);
@@ -30,7 +31,7 @@ export default function PantryItem({
 
     if (nextQuantity > 1000000000) return;
 
-    onChangeQuantity(direction * step);
+    onChangeQuantity(direction < 0 ? -Math.min(amount, step) : step);
   }
 
     return (
@@ -38,6 +39,7 @@ export default function PantryItem({
             <View style={styles.left}>
                 <Text>{name}</Text>
                 <Text>Expires: {date || "Not provided"}</Text>
+                <Button title="Edit batch" onPress={onEdit} disabled={disabled || !onEdit} />
                 <Button title="Delete batch" color="#b00020" onPress={onDelete} disabled={disabled} />
                 {!canAdjust ? (
                 <Text>
@@ -54,7 +56,7 @@ export default function PantryItem({
                         disabled={
                             disabled ||
                             !canAdjust ||
-                            amount - step < 0
+                            amount <= 0
                         }
                         color="#FFFFFF"
                     />

@@ -4,7 +4,6 @@ import { ScrollView, Text, Button, View } from "react-native";
 import { usePantry } from "../PantryGate";
 import HouseholdPanel from "../Components/HouseholdPanel";
 import PantryNotifications from "../Components/PantryNotifications";
-
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSession } from "../Services/session";

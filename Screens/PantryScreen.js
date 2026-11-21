@@ -1,17 +1,20 @@
 // Displays all the ingredients currently stored in the pantry
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useState, useRef } from "react";
 import { Alert, View, Text, TextInput, FlatList, Button, Modal, StyleSheet, Pressable, KeyboardAvoidingView, Platform} from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { UNITS } from "../data/units";
 import PantryItem from "../Components/PantryItem";
 import { useSession } from "../Services/session";
 import { usePantry } from "../PantryGate";
+import { useFocusEffect } from "@react-navigation/native";
+import PantryNotifications from "../Components/PantryNotifications";
 
 import {
   getPantryItems,
   addPantryItem,
   updatePantryItem,
   adjustPantryQuantity,
+  deletePantryItem,
 } from "../Services/pantryService";
 
 const UNIT_NAMES = Object.keys(UNITS);
@@ -31,7 +34,7 @@ const parseDate = (str) => {
   return new Date(y, m - 1, d);
 };
 
-export default function Pantry() {
+export default function Pantry({navigation }) {
   const { token } = useSession();
   const { selectedPantry } = usePantry();
 
@@ -40,10 +43,11 @@ export default function Pantry() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showAddItem, setShowAddItem] = useState(false);
+  const [editingBatch, setEditingBatch] = useState(null);
   const [hideEmpty, setHideEmpty] = useState(false);
   const quantityRequestRunning = useRef(false);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let active = true;
 
     setLoading(true);
@@ -51,9 +55,6 @@ export default function Pantry() {
     setError('');
 
     getPantryItems(token, selectedPantry.id)
-      .then((result) => {
-        if (active) setItems(result);
-      })
       .catch((err) => {
         if (active) setError(err.message);
       })
@@ -64,11 +65,11 @@ export default function Pantry() {
     return () => {
       active = false;
     };
-  }, [token, selectedPantry.id]);
+  }, [token, selectedPantry.id]));
 
   async function refreshItems() {
-    setLoading(true);
     if (saving || loading) return;
+    setLoading(true);
     setError('');
 
     try {
@@ -107,53 +108,104 @@ export default function Pantry() {
     }
   );
 
+  function closeBatchForm() {
+    setEditingBatch(null);
+    setName("");
+    setQuantity("");
+    setTotalCost("");
+    setUnit(UNIT_NAMES[0]);
+    setExpirationDate("");
+    setShowDatePicker(false);
+    setShowUnits(false);
+    setShowAddItem(false);
+  }
+
+  function openEditBatch(item) {
+    if (saving || loading || quantityRequestRunning.current) return;
+
+    setError("");
+    setEditingBatch(item);
+    setName(item.name);
+    setQuantity(String(item.quantity));
+    setTotalCost(item.total_cost == null ? "" : String(item.total_cost));
+    setUnit(item.unit);
+    setExpirationDate(item.expiration_date ?? "");
+    setShowDatePicker(false);
+    setShowUnits(false);
+    setShowAddItem(true);
+  }
+
   const addItem = async () => {
-    if (saving || loading) return;
+    if (saving || loading || quantityRequestRunning.current) return;
 
-    const amount = Number(quantity);
-
-    if (
-      !name.trim() ||
-      !quantity.trim() ||
-      !Number.isFinite(amount) ||
-      amount < 0
-    ) {
-      setError('Enter a name and a valid nonnegative quantity.');
-      return;
-    }
-
+    const cleanName = name.trim();
+    const amountText = quantity.trim();
+    const amount = Number(amountText);
     const priceText = totalCost.trim();
     const price = priceText === "" ? null : Number(priceText);
 
-    if (
-      price !== null &&
-      (!Number.isFinite(price) || price < 0 || price > 1000000000 || amount <= 0)
-    ) {
-      setError("Enter a valid nonnegative purchase price and a positive quantity.");
+    if (!cleanName || cleanName.length > 150) {
+      setError("Enter an item name between 1 and 150 characters.");
       return;
     }
 
+    if (
+      !amountText ||
+      !Number.isFinite(amount) ||
+      amount < 0 ||
+      amount > 1000000000
+    ) {
+      setError("Enter a quantity between 0 and 1,000,000,000.");
+      return;
+    }
+
+    if (
+      price !== null &&
+      (!Number.isFinite(price) || price < 0 || price > 1000000000)
+    ) {
+      setError("Enter a valid nonnegative purchase price.");
+      return;
+    }
+
+    if (!editingBatch && price !== null && amount === 0) {
+      setError("Enter a positive quantity when adding a batch with a price.");
+      return;
+    }
+
+    const pantryId = selectedPantry.id;
+    const body = {
+      name: cleanName,
+      quantity: amount,
+      unit,
+      expiration_date: expirationDate || null,
+      total_cost: price,
+    };
+
     setSaving(true);
-    setError('');
+    setError("");
 
     try {
-      const savedItem = await addPantryItem(token, selectedPantry.id, {
-        name: name.trim(),
-        quantity: amount,
-        unit,
-        // YYYY-MM-DD string or null when no date is picked
-        expiration_date: expirationDate || null,
-        total_cost: price,
-      });
+      if (editingBatch) {
+        const savedItem = await updatePantryItem(
+          token,
+          pantryId,
+          editingBatch.id,
+          {
+            ...body,
+            purchased_on: editingBatch.purchased_on ?? null,
+            expected_quantity: Number(editingBatch.quantity),
+          }
+        );
 
-      setItems((current) => [savedItem, ...current]);
+        setItems((current) =>
+          current.map((item) => item.id === editingBatch.id ? savedItem : item)
+        );
+      } else {
+        const savedItem = await addPantryItem(token, pantryId, body);
+        setItems((current) => [savedItem, ...current]);
+      }
 
-      setName('');
-      setQuantity('');
-      setTotalCost('');
-      setUnit(UNIT_NAMES[0]);
-      setExpirationDate('');
-      setShowDatePicker(false);
+      closeBatchForm();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -263,15 +315,28 @@ export default function Pantry() {
       />
 
       <FlatList
+          ListHeaderComponent={
+          <PantryNotifications
+            key={selectedPantry.id}
+            pantry={selectedPantry}
+            onShop={({ name, unit }) =>
+              navigation.navigate("Shopping", {
+                draft: { pantryId: selectedPantry.id, name, unit },
+              })
+            }
+          />
+          }
         data={filteredItems}
         renderItem={({ item }) => (
           <PantryItem
             {...item}
             disabled={saving || loading}
             onChangeQuantity={(q) => updateQuantity(item.id, q)}
+            onEdit={() => openEditBatch(item)}
             onDelete={() => confirmDeleteBatch(item)}
           />
         )}
+
         keyExtractor={item => item.id.toString()}
         refreshing={loading}
         onRefresh={refreshItems}
@@ -300,15 +365,21 @@ export default function Pantry() {
 
       {showAddItem && (
       <>
+
       <View style={styles.addHeader}>
-        <Text style={styles.label}>Add a new item</Text>
+        <Text style={styles.label}>
+          {editingBatch ? "Edit batch" : "Add a new item"}
+        </Text>
+
         <Pressable
-          onPress={() => setShowAddItem(false)}
-          hitSlop={12} // Increase hit box
+          onPress={closeBatchForm}
+          disabled={saving}
+          hitSlop={12}
         >
           <Text style={styles.cancelButton}>Cancel</Text>
-      </Pressable>
+        </Pressable>
       </View>
+
         {/* Name input */}
       <View style={styles.addContainer}>
         <Text style={styles.label}>Name</Text>
@@ -408,7 +479,7 @@ export default function Pantry() {
         </Modal>
 
         <Button
-          title={saving ? "Saving…" : "Add item"}
+          title={saving ? "Saving…" : editingBatch ? "Save changes" : "Add item"}
           onPress={addItem}
           disabled={saving || loading}
         />

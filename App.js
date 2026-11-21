@@ -13,7 +13,7 @@ import PushRegistrar from "./Components/PushRegistrar";
 const Tab = createBottomTabNavigator();
 
 // Icons we will replace with Ellie's
-const icons = { Home: "home", Pantry: "basket", Recipes: "restaurant" };
+const icons = { Home: "home", Pantry: "basket", Recipes: "restaurant", Shopping: "cart" };
 
 export default function App() {
   return (

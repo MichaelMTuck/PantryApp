@@ -425,10 +425,20 @@ router.put(
   async (req, res) => {
     const itemId = itemIdFromRequest(req);
     const item = validateItem(req.body);
+    const expectedQuantity = req.body.expected_quantity;
+
+    if (
+      expectedQuantity !== undefined &&
+      (!Number.isFinite(expectedQuantity) ||
+        expectedQuantity < 0 ||
+        expectedQuantity > 1000000000)
+    ) {
+      fail(400, 'Invalid original quantity.');
+    }
 
     const saved = await transaction(async (client) => {
       const existing = await client.query(
-        `SELECT id
+        `SELECT id, quantity::float8 AS quantity
          FROM pantry_app.pantry_items
          WHERE id = $1 AND pantry_id = $2
          FOR UPDATE`,
@@ -439,10 +449,17 @@ router.put(
         fail(404, 'Pantry item not found.');
       }
 
-      const ingredientId = await findOrCreateIngredient(
-        client,
-        item.name
-      );
+      if (
+        expectedQuantity !== undefined &&
+        existing.rows[0].quantity !== expectedQuantity
+      ) {
+        fail(
+          409,
+          'Quantity changed. Cancel this edit, refresh Pantry, and reopen the batch.'
+        );
+      }
+
+      const ingredientId = await findOrCreateIngredient(client, item.name);
 
       await client.query(
         `UPDATE pantry_app.pantry_items

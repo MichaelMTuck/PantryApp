@@ -1,10 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-
 import { useSession } from "../Services/session";
 import { getPantryItems } from "../Services/pantryService";
-
 // Item is low stock when less than or equal these thresholds
 const LOW_STOCK_THRESHOLDS = {
   items: 2,
@@ -52,34 +50,28 @@ function formatQty(n) {
 function buildNotifications(items) {
   const notes = [];
 
+  const stockByIngredient = new Map();
+
   items.forEach((item) => {
     const qty = Number(item.quantity);
 
-    // Stock alerts
-    if (qty <= 0) {
-      notes.push({
-        key: `stock-${item.id}`,
-        type: "stock",
-        rank: 2,
-        tag: "OUT OF STOCK",
-        icon: "📦",
-        message: `${item.name} is out of stock`,
-      });
-    } else if (qty <= LOW_STOCK_THRESHOLDS[item.unit]) {
-      notes.push({
-        key: `stock-${item.id}`,
-        type: "stock",
-        rank: 3,
-        tag: "LOW STOCK",
-        icon: "📦",
-        message: `${item.name} is running low (${formatQty(qty)} ${item.unit} left)`,
-      });
+    const exp = parseExpiration(item.expiration_date);
+    const days = exp ? daysUntil(exp) : null;
+    const unit = item.unit.trim().toLowerCase();
+    const ingredient = item.ingredient_id ?? item.name.trim().toLowerCase();
+    const stockKey = `${ingredient}:${unit}`;
+
+    if (!stockByIngredient.has(stockKey)) {
+      stockByIngredient.set(stockKey, { name: item.name, unit, quantity: 0 });
+    }
+
+    if (Number.isFinite(qty) && qty > 0 && (days === null || days >= 0)) {
+      stockByIngredient.get(stockKey).quantity += qty;
     }
 
     // Expiration alerts, skip items with 0 qty
-    const exp = parseExpiration(item.expiration_date);
     if (exp && qty > 0) {
-      const days = daysUntil(exp);
+
       let note = null;
 
       if (days < 0) {
@@ -98,17 +90,37 @@ function buildNotifications(items) {
     }
   });
 
+
+  for (const [key, stock] of stockByIngredient) {
+    const { name, unit } = stock;
+    const qty = Math.round(stock.quantity * 10000) / 10000;
+
+    if (qty > 0 && !(qty <= LOW_STOCK_THRESHOLDS[unit])) continue;
+
+    notes.push({
+      key: `stock-${key}`,
+      type: "stock",
+      name,
+      unit,
+      rank: qty === 0 ? 2 : 3,
+      tag: qty === 0 ? "OUT OF STOCK" : "LOW STOCK",
+      icon: "📦",
+      message: qty === 0
+        ? `${name} is out of stock`
+        : `${name} is running low (${formatQty(qty)} ${unit} left)`,
+    });
+  }
+
   // Priority sorting
   notes.sort((a, b) => a.rank - b.rank);
   return notes;
 }
 
-export default function PantryNotifications({ pantry }) {
-  const { token } = useSession();
-
+export default function PantryNotifications({ pantry, onShop }) {
+  const [expanded, setExpanded] = useState(false);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(false);
+  const { token } = useSession();
 
   // Reload when Home gains focus to match Pantry changes
   useFocusEffect(
@@ -156,20 +168,27 @@ export default function PantryNotifications({ pantry }) {
 
       {visible.map((n) => {
         const colors = TYPE_COLORS[n.type];
+        const action = n.type === "stock" && onShop ? () => onShop(n) : undefined;
         return (
-          <View
+          <Pressable
             key={n.key}
             style={[
               styles.card,
               { backgroundColor: colors.bg, borderLeftColor: colors.border },
             ]}
+            onPress={action}
+            disabled={!action}
+            accessibilityRole={action ? "button" : undefined}
           >
             <Text style={styles.icon}>{n.icon}</Text>
             <View style={styles.body}>
+              {n.type === "stock" ? (
+                <Text style={styles.toggle}>Add to shopping list</Text>
+              ) : null}
               <Text style={[styles.tag, { color: colors.text }]}>{n.tag}</Text>
               <Text style={[styles.message, { color: colors.text }]}>{n.message}</Text>
             </View>
-          </View>
+         </Pressable>
         );
       })}
 
