@@ -49,14 +49,17 @@ export default function Pantry({navigation }) {
   const [hideEmpty, setHideEmpty] = useState(false);
   const quantityRequestRunning = useRef(false);
 
-  useFocusEffect(useCallback(() => {
+useFocusEffect(
+  useCallback(() => {
     let active = true;
 
     setLoading(true);
-    setItems([]);
-    setError('');
+    setError("");
 
     getPantryItems(token, selectedPantry.id)
+      .then((rows) => {
+        if (active) setItems(rows);
+      })
       .catch((err) => {
         if (active) setError(err.message);
       })
@@ -67,7 +70,8 @@ export default function Pantry({navigation }) {
     return () => {
       active = false;
     };
-  }, [token, selectedPantry.id]));
+  }, [token, selectedPantry.id])
+);
 
   async function refreshItems() {
     if (saving || loading) return;
