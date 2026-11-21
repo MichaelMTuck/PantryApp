@@ -18,6 +18,7 @@ import RecipeCard from "../Components/RecipeCard";
 import { useSession } from "../Services/session";
 import { usePantry } from "../PantryGate";
 import { getRecipes } from "../Services/recipeService";
+import { COLORS } from "../data/theme";
 
 
 export default function Recipes() {
@@ -25,7 +26,7 @@ export default function Recipes() {
   const { token } = useSession();
   const { selectedPantry } = usePantry();
 
-  const [recipes, setRecipes] = useState([]);;
+  const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -34,23 +35,13 @@ export default function Recipes() {
     useCallback(() => {
       let active = true;
 
-      console.log("Recipe list focused; pantry:", selectedPantry.id);
-
       setLoading(true);
       setError("");
 
       getRecipes(token, selectedPantry.id)
         .then((result) => {
-          console.log(
-            "Recipes returned:",
-            result.map((recipe) => ({
-              id: recipe.id,
-              name: recipe.name,
-            }))
-        );
-        if (active) setRecipes(result);
+          if (active) setRecipes(result);
         })
-        
         .catch((err) => {
           if (active) setError(err.message);
         })
@@ -78,41 +69,6 @@ export default function Recipes() {
     }
   }
 
-  // Commented out the in line detail view for a selected recipe
-  /* if (selectedRecipe) {
-    return (
-      <ScrollView contentContainerStyle={styles.container}>
-        <Button
-          title="Back to recipes"
-          onPress={() => setSelectedRecipe(null)}
-        />
-
-        <Text style={styles.title}>{selectedRecipe.name}</Text>
-        <Text>{selectedRecipe.time}</Text>
-        <Text>Servings: {selectedRecipe.servings}</Text>
-
-        {selectedRecipe.description ? (
-          <Text>{selectedRecipe.description}</Text>
-        ) : null}
-
-        <Text style={styles.heading}>Ingredients</Text>
-
-        {selectedRecipe.ingredients.map((ingredient, index) => (
-          <Text key={index} style={styles.line}>
-            • {ingredient}
-          </Text>
-        ))}
-
-        <Text style={styles.heading}>Steps</Text>
-
-        {selectedRecipe.steps.map((step, index) => (
-          <Text key={index} style={styles.line}>
-            {index + 1}. {step}
-          </Text>
-        ))}
-      </ScrollView>
-    );
-  } */
 
   return (
     <View style={styles.container}>
@@ -159,11 +115,11 @@ export default function Recipes() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 16, backgroundColor: "#f5f5f5" },
+  container: { flexGrow: 1, padding: 16, backgroundColor: COLORS.background },
   title: { fontSize: 24, marginVertical: 12 },
   heading: { fontSize: 18, marginTop: 16, marginBottom: 6 },
   line: { fontSize: 15, marginBottom: 6 },
-  error: { color: "#b00020", marginBottom: 12 },
+  error: { color: COLORS.red, marginBottom: 12 },
   // For moving our circle to the bottom
   fabWrapper: {
     position: "absolute",
@@ -177,29 +133,29 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#2ecc71",
+    backgroundColor: COLORS.green,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 4,
-    borderColor: "#fff",
+    borderColor: COLORS.background,
     // iOS shadow
-    // Adds a little hugh around the button, makes it look nice
-    shadowColor: "#000",
+    // Adds a shadow around the button
+    shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
+    shadowOpacity: 0.25,
     shadowRadius: 6,
     // Android shadow
     elevation: 8,
   },
   // Just makes it darker and slightly smaller
   circleButtonPressed: {
-    backgroundColor: "#27ae60",
+    backgroundColor: COLORS.greenDark,
     transform: [{ scale: 0.92 }],
   },
   plus: {
-    color: "#fff",
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: "500",
+    color: COLORS.white,
+    fontSize: 36,
+    lineHeight: 40,
+    fontWeight: "400",
   },
 });

@@ -3,6 +3,7 @@ import { useCallback, useState, useRef } from "react";
 import { Alert, View, Text, TextInput, FlatList, Button, Modal, StyleSheet, Pressable, KeyboardAvoidingView, Platform} from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { UNITS } from "../data/units";
+import { COLORS } from "../data/theme";
 import PantryItem from "../Components/PantryItem";
 import { useSession } from "../Services/session";
 import { usePantry } from "../PantryGate";
@@ -18,6 +19,7 @@ import {
 } from "../Services/pantryService";
 
 const UNIT_NAMES = Object.keys(UNITS);
+
 
 // Formats as YYYY-MM-DD
 const formatDate = (d) => {
@@ -283,11 +285,13 @@ export default function Pantry({navigation }) {
     behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       {error ? (
-        <Text style={{ color: '#b00020' }}>{error}</Text>
+        <Text style={styles.errorText}>{error}</Text>
       ) : null}
 
-      {saving ? <Text>Saving…</Text> : null}
+      {saving ? <Text style={styles.mutedText}>Saving…</Text> : null}
 
+      {!showAddItem && (
+      <>
       <View style={styles.searchHeader}>
         <Text style={styles.searchLabel}>Search</Text>
 
@@ -311,6 +315,7 @@ export default function Pantry({navigation }) {
         placeholder="Search pantry items..."
         value={searchText}
         onChangeText={setSearchText}
+        placeholderTextColor={COLORS.placeholder}
         style={styles.inputCont}
       />
 
@@ -341,15 +346,18 @@ export default function Pantry({navigation }) {
         refreshing={loading}
         onRefresh={refreshItems}
         ListEmptyComponent={
-          <Text>
+          <Text style={styles.mutedText}>
             {loading ? 'Loading…' : 'No matching pantry items.'}
           </Text>
         }
       />
 
+      </>
+      )}
+
       {!showAddItem && (
       // Hideable button to show the add item option
-      <View style={styles.fabWrapper} pointerEvents="box-none">
+      <View style={styles.addButtonWrapper} pointerEvents="box-none">
       <Pressable
           onPress={() => setShowAddItem(true)}
           hitSlop={8} // Increase hit box
@@ -358,7 +366,7 @@ export default function Pantry({navigation }) {
             pressed && styles.circleButtonPressed,
          ]}
         >
-          <Text>Add</Text>
+          <Text style={styles.addButtonPlus}>+</Text>
       </Pressable>
       </View>
       )}
@@ -378,6 +386,7 @@ export default function Pantry({navigation }) {
         >
           <Text style={styles.cancelButton}>Cancel</Text>
         </Pressable>
+        </Pressable>
       </View>
 
         {/* Name input */}
@@ -387,6 +396,7 @@ export default function Pantry({navigation }) {
           placeholder="Name"
           value={name}
           onChangeText={setName}
+          placeholderTextColor={COLORS.placeholder}
           style={styles.textInput}
         />
 
@@ -397,6 +407,7 @@ export default function Pantry({navigation }) {
           value={quantity}
           onChangeText={setQuantity}
           keyboardType="decimal-pad"
+          placeholderTextColor={COLORS.placeholder}
           style={styles.textInput}
         />
 
@@ -407,6 +418,7 @@ export default function Pantry({navigation }) {
           value={totalCost}
           onChangeText={setTotalCost}
           keyboardType="decimal-pad"
+          placeholderTextColor={COLORS.placeholder}
           style={styles.textInput}
         />
 
@@ -416,7 +428,7 @@ export default function Pantry({navigation }) {
           <Button
             title={`${unit}  ▼`}
             onPress={() => setShowUnits(true)}
-            color="#FFFFFF"
+            color={COLORS.blueText}
           />
         </View>
 
@@ -442,7 +454,7 @@ export default function Pantry({navigation }) {
             <Button
               title={expirationDate || "Select date"}
               onPress={() => setShowDatePicker(true)}
-              color="#FFFFFF"
+              color={COLORS.blueText}
             />
           </View>
           {expirationDate !== "" && (
@@ -473,7 +485,7 @@ export default function Pantry({navigation }) {
                 onValueChange={onDateChange}
                 onDismiss={() => setShowDatePicker(false)}
               />
-              <Button title="Done" onPress={() => setShowDatePicker(false)} />
+              <Button title="Done" color={COLORS.greenDark} onPress={() => setShowDatePicker(false)} />
             </Pressable>
           </Pressable>
         </Modal>
@@ -482,7 +494,16 @@ export default function Pantry({navigation }) {
           title={saving ? "Saving…" : editingBatch ? "Save changes" : "Add item"}
           onPress={addItem}
           disabled={saving || loading}
-        />
+          style={({ pressed }) => [
+            styles.submitButton,
+            (saving || loading) && styles.submitButtonDisabled,
+            pressed && styles.submitButtonPressed,
+          ]}
+        >
+          <Text style={styles.submitButtonText}>
+            {saving ? "Saving…" : "Add item"}
+          </Text>
+        </Pressable>
       </View>
       </>
       )}
@@ -491,97 +512,42 @@ export default function Pantry({navigation }) {
 }
 
 const styles = StyleSheet.create({
-  addContainer: {
-    marginLeft: 4
-  },
-
   container: {
     flex: 1,
     padding: 10,
-    backgroundColor: "#f5f5f5"
+    backgroundColor: COLORS.background,
   },
 
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 5,
-    color: "#444444",
-  },
-  circleButton: {
-    // Feel free to change this, it just needs to have it
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#739C40",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 4,
-    borderColor: "#fff",
-    // iOS shadow
-    // Adds a little hugh around the button, makes it look nice
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    // Android shadow
-    elevation: 8,
-  },
-  circleButtonPressed: {
-    backgroundColor: "#739C79",
-    transform: [{ scale: 0.92 }],
-  },
-
-  unitButton: {
-    backgroundColor: "#739C79",
-    borderRadius: 8,
-    paddingVertical: 4,
-    marginVertical: 8,
-  },
-  dateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  dateButton: {
-    flex: 1,
-  },
-  // Dimmed background
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  // White card that holds calendar
-  pickerCard: {
-    width: "100%",
-    maxWidth: 380,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 12,
-  },
+  // Search
   searchHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  addHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 5,
-    marginLeft: 4, // matches addContainer
+  searchLabel: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginTop: 16,
+    marginBottom: 6,
+    marginLeft: 4,
+    color: COLORS.greenDark,
   },
-  fabWrapper: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 24,
-    alignItems: "center",
+  inputCont: {
+    backgroundColor: COLORS.inputBg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    fontSize: 15,
+    color: COLORS.text,
+    marginBottom: 10,
+    marginLeft: 4,
   },
+
+  // Hide/Show empty toggle
   hideEmptyTrue:{
-    backgroundColor: "#739C79",
+    backgroundColor: COLORS.green,
     fontWeight: 600,
     fontSize: 15,
     color: "black",
@@ -594,17 +560,146 @@ const styles = StyleSheet.create({
     color: "black",
     borderWidth: 1,
     borderRadius: 3,
-    backgroundColor: "#739C79",
+    backgroundColor: COLORS.green,
+  },
+
+  // Add item form
+  addHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 16,
+    marginBottom: 10,
+    marginLeft: 4, // matches addContainer
+  },
+  addTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.greenDark,
+  },
+  addContainer: {
+    marginLeft: 4,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 10,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 3,
+    color: COLORS.text,
+  },
+  textInput: {
+    backgroundColor: COLORS.inputBg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 15,
+    color: COLORS.text,
+    marginBottom: 6,
+  },
+  unitButton: {
+    backgroundColor: COLORS.blue,
+    borderRadius: 8,
+    paddingVertical: 2,
+    marginVertical: 4,
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  dateButton: {
+    flex: 1,
   },
   cancelButton: {
     fontSize: 16,
-    fontWeight: 700,
-    color: "red",
-    marginRight: 8
+    fontWeight: "700",
+    color: COLORS.red,
+    marginRight: 8,
   },
-  textInput: {
-    marginBottom: 4
+  submitButton: {
+    backgroundColor: COLORS.green,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+    marginTop: 6,
   },
-  searchLabel: { fontSize: 18, fontWeight: "600", marginTop: 16, marginBottom: 6, marginLeft: 4 },
-  inputCont: { marginBottom: 10, marginLeft: 4}
+  submitButtonPressed: {
+    backgroundColor: COLORS.greenDark,
+  },
+  submitButtonDisabled: {
+    opacity: 0.5,
+  },
+  submitButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  // Date picker modal
+  // Dimmed background
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  // White card that holds calendar
+  pickerCard: {
+    width: "100%",
+    maxWidth: 380,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 12,
+  },
+
+  // Add button
+  addButtonWrapper: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 24,
+    alignItems: "center",
+  },
+  circleButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.green,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 4,
+    borderColor: COLORS.background,
+    // iOS shadow
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    // Android shadow
+    elevation: 8,
+  },
+  circleButtonPressed: {
+    backgroundColor: COLORS.greenDark,
+    transform: [{ scale: 0.92 }],
+  },
+  addButtonPlus: {
+    color: COLORS.white,
+    fontSize: 36,
+    lineHeight: 40,
+    fontWeight: "400",
+  },
+
+  errorText: {
+    color: COLORS.red,
+    marginBottom: 4,
+  },
+  mutedText: {
+    color: COLORS.textMuted,
+  },
 });
