@@ -386,7 +386,6 @@ export default function Pantry({navigation }) {
         >
           <Text style={styles.cancelButton}>Cancel</Text>
         </Pressable>
-        </Pressable>
       </View>
 
         {/* Name input */}
@@ -503,7 +502,6 @@ export default function Pantry({navigation }) {
           <Text style={styles.submitButtonText}>
             {saving ? "Saving…" : "Add item"}
           </Text>
-        </Pressable>
       </View>
       </>
       )}
