@@ -489,8 +489,8 @@ export default function Pantry({navigation }) {
           </Pressable>
         </Modal>
 
-        <Button
-          title={saving ? "Saving…" : editingBatch ? "Save changes" : "Add item"}
+        <Pressable
+          accessibilityRole="button"
           onPress={addItem}
           disabled={saving || loading}
           style={({ pressed }) => [
@@ -500,8 +500,9 @@ export default function Pantry({navigation }) {
           ]}
         >
           <Text style={styles.submitButtonText}>
-            {saving ? "Saving…" : "Add item"}
+            {saving ? "Saving…" : editingBatch ? "Save changes" : "Add item"}
           </Text>
+        </Pressable>
       </View>
       </>
       )}
