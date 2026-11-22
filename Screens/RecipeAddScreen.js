@@ -226,7 +226,7 @@ export default function RecipeAdd(){
 
             <TextInput
               style={[styles.input, styles.stepInput]}
-              placeholder="2 Cups of Flower"
+              placeholder="2 cups flour"
               placeholderTextColor={COLORS.placeholder}
               value={ingredient.text}
               onChangeText={(v) => updateIngredients(ingredient.id, v)}
