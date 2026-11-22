@@ -79,6 +79,11 @@ export default function Home({ navigation }) {
       <PantryNotifications
         key={`notifications-${selectedPantry.id}`}
         pantry={selectedPantry}
+        onShop={({ name, unit }) =>
+          navigation.navigate("Shopping", {
+            draft: { pantryId: selectedPantry.id, name, unit },
+          })
+        }
       />
 
       <HouseholdPanel
