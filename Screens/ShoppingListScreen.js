@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Button, ScrollView, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { COLORS } from "../data/theme";
 import { usePantry } from "../PantryGate";
 import { useSession } from "../Services/session";
 import {
@@ -59,47 +60,256 @@ export default function ShoppingListScreen({ route }) {
   }
 
   const busy = loading || saving;
-  const inputStyle = { borderWidth: 1, padding: 10, marginBottom: 8 };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-      <TextInput style={inputStyle} placeholder="Item name" value={name} onChangeText={setName} />
-      <TextInput style={inputStyle} placeholder="Quantity" value={quantity}
-        onChangeText={setQuantity} keyboardType="decimal-pad" />
-      <TextInput style={inputStyle} placeholder="Unit" value={unit} onChangeText={setUnit} />
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {saving ? <Text style={styles.mutedText}>Saving…</Text> : null}
 
-      <Button title="Add to shopping list" disabled={busy} onPress={() => save(async () => {
-        const added = await addShoppingItem(token, pantryId, {
-          name, quantity: Number(quantity), unit,
-        });
-        setItems((current) => [...current, added]);
-        setName("");
-        setQuantity("1");
-      })} />
+      {/* Add item form */}
+      <Text style={styles.sectionTitle}>Add to shopping list</Text>
+      <View style={styles.addContainer}>
+        <Text style={styles.label}>Name</Text>
+        <TextInput
+          style={styles.textInput}
+          placeholder="Item name"
+          placeholderTextColor={COLORS.placeholder}
+          value={name}
+          onChangeText={setName}
+        />
 
-      {loading ? <Text>Loading shopping list…</Text> : null}
-      {error ? <Text style={{ color: "#b00020" }}>{error}</Text> : null}
+        <Text style={styles.label}>Quantity</Text>
+        <TextInput
+          style={styles.textInput}
+          placeholder="Quantity"
+          placeholderTextColor={COLORS.placeholder}
+          value={quantity}
+          onChangeText={setQuantity}
+          keyboardType="decimal-pad"
+        />
+
+        <Text style={styles.label}>Unit</Text>
+        <TextInput
+          style={styles.textInput}
+          placeholder="Unit"
+          placeholderTextColor={COLORS.placeholder}
+          value={unit}
+          onChangeText={setUnit}
+        />
+
+        <Pressable
+          disabled={busy}
+          onPress={() => save(async () => {
+            const added = await addShoppingItem(token, pantryId, {
+              name, quantity: Number(quantity), unit,
+            });
+            setItems((current) => [...current, added]);
+            setName("");
+            setQuantity("1");
+          })}
+          style={({ pressed }) => [
+            styles.submitButton,
+            busy && styles.submitButtonDisabled,
+            pressed && styles.submitButtonPressed,
+          ]}
+        >
+          <Text style={styles.submitButtonText}>
+            {saving ? "Saving…" : "Add to shopping list"}
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* List */}
+      <Text style={styles.sectionTitle}>Your list</Text>
+      {loading ? <Text style={styles.mutedText}>Loading shopping list…</Text> : null}
+      {!loading && items.length === 0 ? (
+        <Text style={styles.mutedText}>Your shopping list is empty.</Text>
+      ) : null}
 
       {items.map((item) => (
-        <View key={item.id} style={{ paddingVertical: 10 }}>
-          <Text>
-            {item.checked ? "✓ " : ""}{item.name} · {item.quantity} {item.unit}
-          </Text>
-          <Button title={item.checked ? "Uncheck" : "Check off"} disabled={busy}
-            onPress={() => save(async () => {
-              const updated = await setShoppingItemChecked(
-                token, pantryId, item.id, !item.checked
-              );
-              setItems((current) => current.map((row) =>
-                row.id === item.id ? { ...row, ...updated } : row
-              ));
-            })} />
-          <Button title="Remove" disabled={busy} onPress={() => save(async () => {
-            await deleteShoppingItem(token, pantryId, item.id);
-            setItems((current) => current.filter((row) => row.id !== item.id));
-          })} />
+        <View key={item.id} style={styles.itemCard}>
+          <View style={styles.itemInfo}>
+            <Text style={[styles.itemName, item.checked && styles.itemTextChecked]}>
+              {item.checked ? "✓ " : ""}{item.name}
+            </Text>
+            <Text style={[styles.itemQuantity, item.checked && styles.itemTextChecked]}>
+              {item.quantity} {item.unit}
+            </Text>
+          </View>
+
+          <View style={styles.itemActions}>
+            <Pressable
+              disabled={busy}
+              onPress={() => save(async () => {
+                const updated = await setShoppingItemChecked(
+                  token, pantryId, item.id, !item.checked
+                );
+                setItems((current) => current.map((row) =>
+                  row.id === item.id ? { ...row, ...updated } : row
+                ));
+              })}
+              style={({ pressed }) => [
+                styles.checkButton,
+                busy && styles.submitButtonDisabled,
+                pressed && styles.checkButtonPressed,
+              ]}
+            >
+              <Text style={styles.checkButtonText}>
+                {item.checked ? "Uncheck" : "Check off"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              disabled={busy}
+              hitSlop={12}
+              onPress={() => save(async () => {
+                await deleteShoppingItem(token, pantryId, item.id);
+                setItems((current) => current.filter((row) => row.id !== item.id));
+              })}
+            >
+              <Text style={[styles.removeText, busy && styles.submitButtonDisabled]}>
+                Remove
+              </Text>
+            </Pressable>
+          </View>
         </View>
       ))}
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  content: {
+    padding: 10,
+    paddingBottom: 32,
+  },
+
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginTop: 16,
+    marginBottom: 6,
+    marginLeft: 4,
+    color: COLORS.greenDark,
+  },
+
+  // Add form
+  addContainer: {
+    marginLeft: 4,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 10,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 3,
+    color: COLORS.text,
+  },
+  textInput: {
+    backgroundColor: COLORS.inputBg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 15,
+    color: COLORS.text,
+    marginBottom: 6,
+  },
+  submitButton: {
+    backgroundColor: COLORS.green,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+    marginTop: 6,
+  },
+  submitButtonPressed: {
+    backgroundColor: COLORS.greenDark,
+  },
+  submitButtonDisabled: {
+    opacity: 0.5,
+  },
+  submitButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  // List items
+  itemCard: {
+    backgroundColor: COLORS.surface,
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: COLORS.shadow,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  itemInfo: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  itemName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  itemQuantity: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  itemTextChecked: {
+    color: COLORS.textMuted,
+    textDecorationLine: "line-through",
+  },
+  itemActions: {
+    alignItems: "center",
+    gap: 10,
+  },
+  checkButton: {
+    backgroundColor: COLORS.blue,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    minWidth: 96,
+    alignItems: "center",
+  },
+  checkButtonPressed: {
+    backgroundColor: COLORS.blueDark,
+  },
+  checkButtonText: {
+    color: COLORS.blueText,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  removeText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.red,
+  },
+
+  errorText: {
+    color: COLORS.red,
+    marginBottom: 4,
+  },
+  mutedText: {
+    color: COLORS.textMuted,
+    marginLeft: 4,
+  },
+});
