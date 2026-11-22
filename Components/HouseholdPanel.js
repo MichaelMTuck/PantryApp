@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button, Text, View } from 'react-native';
-
+import { Alert, Button, Text, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useSession } from '../Services/session';
 import {createPantryInvite, getPantryMembers,} from '../Services/pantryService';
 
@@ -63,7 +63,7 @@ export default function HouseholdPanel({ pantry }) {
           ))
         : null}
 
-      {pantry.role === 'owner' ? (
+      {pantry.role === 'owner' && (
         <View style={{ marginTop: 8 }}>
           <Button
             title={busy ? 'Creating invite…' : 'Create invite'}
@@ -71,14 +71,33 @@ export default function HouseholdPanel({ pantry }) {
             disabled={busy}
           />
 
-          {inviteCode ? (
-            <Text selectable style={{ marginTop: 8 }}>
-              Invite code (share this with a member of your 'household'):{' '}
-              {inviteCode}
-            </Text>
-          ) : null}
+          {inviteCode !== '' && (
+            <View style={{ marginTop: 8 }}>
+              <Text selectable>Invite code: {inviteCode}</Text>
+
+              <Button
+                title="Copy invite code"
+                onPress={async () => {
+                  try {
+                    const copied = await Clipboard.setStringAsync(inviteCode);
+
+                    if (!copied) {
+                      throw new Error('Copy failed');
+                    }
+
+                    Alert.alert('Copied', 'The invite code is on your clipboard.');
+                  } catch {
+                    Alert.alert(
+                      'Could not copy',
+                      'Press and hold the code to copy it manually.'
+                    );
+                  }
+                }}
+              />
+            </View>
+          )}
         </View>
-      ) : null}
+      )}
 
       {error ? (
         <Text style={{ color: '#b00020', marginTop: 8 }}>{error}</Text>

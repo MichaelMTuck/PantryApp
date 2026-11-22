@@ -466,7 +466,7 @@ router.put(
          SET
            ingredient_id = $3,
            quantity = $4,
-           unit = $5,
+           unit = $5::varchar,
            expiration_date = $6,
            purchased_on = $7,
            total_cost = $8,
@@ -475,7 +475,7 @@ router.put(
              WHEN cost_basis_quantity IS NOT NULL
                   AND total_cost = $8::numeric
                   AND ingredient_id = $3
-                  AND unit = $5
+                  AND unit = $5::varchar
                THEN cost_basis_quantity
              WHEN $4::numeric >= 0.0001 THEN $4::numeric
              ELSE NULL
