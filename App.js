@@ -8,7 +8,6 @@ import RecipeStack from "./Screens/RecipeStack";
 import ShoppingListScreen from "./Screens/ShoppingListScreen";
 import AuthGate from "./AuthGate";
 import PantryGate from "./PantryGate";
-import PushRegistrar from "./Components/PushRegistrar";
 
 const Tab = createBottomTabNavigator();
 
@@ -18,7 +17,6 @@ const icons = { Home: "home", Pantry: "basket", Recipes: "restaurant", Shopping:
 export default function App() {
   return (
     <AuthGate>
-      <PushRegistrar />
       <PantryGate>
         {/* https://dev.to/fonyuygita/building-veli-a-complete-react-native-tab-navigation-tutorial-gnm */}
         <NavigationContainer>
