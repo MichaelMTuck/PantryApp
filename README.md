@@ -33,7 +33,7 @@ npm install
 
 This downloads all the project's packages automatically:
 
-`expo`, `react`, `react-dom`, `react-native`, `react-native-web`, `@react-navigation/native`, `@react-navigation/bottom-tabs`, `@react-navigation/native-stack`, `react-native-screens`, `react-native-safe-area-context`, `@react-native-community/datetimepicker`, `expo-secure-store`, `expo-notifications`, `expo-device`, `expo-constants`, `@expo/vector-icons`, `expo-status-bar`
+`expo`, `react`, `react-dom`, `react-native`, `react-native-web`, `@react-navigation/native`, `@react-navigation/bottom-tabs`, `@react-navigation/native-stack`, `react-native-screens`, `react-native-safe-area-context`, `@react-native-community/datetimepicker`, `expo-secure-store`, `expo-notifications`, `expo-device`, `expo-clipboard`, `expo-constants`, `@expo/vector-icons`, `expo-status-bar`
 
 ### 5. Start the app
 

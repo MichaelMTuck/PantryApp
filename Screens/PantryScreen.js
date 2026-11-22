@@ -8,7 +8,6 @@ import PantryItem from "../Components/PantryItem";
 import { useSession } from "../Services/session";
 import { usePantry } from "../PantryGate";
 import { useFocusEffect } from "@react-navigation/native";
-import PantryNotifications from "../Components/PantryNotifications";
 
 import {
   getPantryItems,
@@ -36,7 +35,7 @@ const parseDate = (str) => {
   return new Date(y, m - 1, d);
 };
 
-export default function Pantry({navigation }) {
+export default function Pantry() {
   const { token } = useSession();
   const { selectedPantry } = usePantry();
 
@@ -324,17 +323,6 @@ useFocusEffect(
       />
 
       <FlatList
-          ListHeaderComponent={
-          <PantryNotifications
-            key={selectedPantry.id}
-            pantry={selectedPantry}
-            onShop={({ name, unit }) =>
-              navigation.navigate("Shopping", {
-                draft: { pantryId: selectedPantry.id, name, unit },
-              })
-            }
-          />
-          }
         data={filteredItems}
         renderItem={({ item }) => (
           <PantryItem
